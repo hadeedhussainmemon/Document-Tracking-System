@@ -26,11 +26,38 @@ app.use(express.json());
 // Enable CORS for development client; use an environment variable to lock down in production
 // Enable CORS for development client; use an environment variable to lock down in production
 // Explicitly allow x-auth-token header used by the client and common HTTP methods.
-app.use(cors({ 
-    origin: process.env.CLIENT_ORIGIN || '*',
-    methods: ['GET','POST','PUT','DELETE','OPTIONS'],
-    allowedHeaders: ['Content-Type','x-auth-token','Authorization']
-}));
+// CORS: whitelist origins from CLIENT_ORIGIN (comma-separated env var) and allow credentials
+const rawClientOrigin = (process.env.CLIENT_ORIGIN || '').toString();
+const clientOrigins = rawClientOrigin
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+    .map(orig => {
+        // Normalize origins so both 'example.com' and 'https://example.com' work
+        if (!/^https?:\/\//i.test(orig)) return `https://${orig}`;
+        return orig;
+    });
+
+const corsOptions = {
+    origin: (origin, callback) => {
+        // If incoming request has no origin (curl, server-to-server), allow it
+        if (!origin) return callback(null, true);
+        // If no origins are configured, fail closed (do not allow) to avoid open CORS by default
+        if (clientOrigins.length === 0) {
+            console.warn('CLIENT_ORIGIN not configured: rejecting cross-origin request from', origin);
+            return callback(new Error('Origin not allowed by CORS'));
+        }
+        if (clientOrigins.includes(origin)) return callback(null, true);
+        console.warn('Blocked CORS request from origin', origin);
+        return callback(new Error('Origin not allowed by CORS'));
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'x-auth-token', 'Authorization', 'Accept'],
+    credentials: true,
+    optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
 
 // Normalize incoming paths: allow both /api/... and /... to reach the same routes.
 app.use((req, res, next) => {

@@ -13,6 +13,17 @@ let apiBase = (import.meta.env.VITE_API_URL || '').trim().replace(/^\/+|\/+$/g, 
 if (apiBase && !apiBase.startsWith('http://') && !apiBase.startsWith('https://')) {
   apiBase = 'https://' + apiBase;
 }
+// If a base is set (production/staging backend), make sure it calls the API path
+if (apiBase) {
+  // Do not duplicate /api prefix
+  if (!/\/api($|\/)/.test(apiBase)) {
+    apiBase = apiBase.replace(/\/$/, '') + '/api';
+  }
+} else {
+  // In development, use /api as the base so Vite can proxy requests to the backend
+  apiBase = import.meta.env.DEV ? '/api' : '';
+}
+
 axios.defaults.baseURL = apiBase;
 
 // Log the base URL during development to assist debugging on staging/production
