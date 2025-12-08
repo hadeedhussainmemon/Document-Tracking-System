@@ -32,6 +32,14 @@ app.use(cors({
     allowedHeaders: ['Content-Type','x-auth-token','Authorization']
 }));
 
+// Normalize incoming paths: allow both /api/... and /... to reach the same routes.
+app.use((req, res, next) => {
+    if (req.originalUrl && req.originalUrl.startsWith('/api/')) {
+        req.url = req.url.replace(/^\/api/, '');
+    }
+    next();
+});
+
 app.use('/auth', authRoutes);
 app.use('/documents', documentRoutes);
 app.use('/users', usersRoutes);
