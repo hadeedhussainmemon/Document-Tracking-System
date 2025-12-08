@@ -127,7 +127,7 @@ if (!skipDB) {
 
 // Start local server only if not serverless and not in test mode
 if (!isServerless && process.env.NODE_ENV !== 'test') {
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
         console.log(`Server is running on port ${PORT}`);
     });
 }
