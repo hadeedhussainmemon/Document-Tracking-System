@@ -159,6 +159,13 @@ To run the app in development mode, you will need two terminals.
     ```bash
     npm run dev
     ```
+If you don't have a MongoDB connection or want to run the backend without database access (e.g., front-end development or tests that don't require DB), you can set `SKIP_DB=true`:
+
+```powershell
+set SKIP_DB=true
+npm run dev
+```
+When `SKIP_DB` is set the backend will start without connecting to MongoDB; some features will be disabled (e.g., admin creation, data queries).
 
 2.  **Start the Frontend:**
     In the `frontend/` directory, run:
@@ -215,6 +222,28 @@ set MONGODB_URI="mongodb://localhost:27017/docs-tracker"
 npm run dev
 ```
 
+## Health endpoint and runtime checks
+
+- The backend exposes a simple non-DB health check at `/health` that you can use to verify the server is up:
+
+```
+GET https://your-backend-vercel-url.vercel.app/health
+
+Response:
+{
+    "status": "ok",
+    "time": "2025-12-08T..."
+}
+```
+
+- Use this to confirm the Vercel function is reachable (build succeeded) while DB issues may still prevent other API endpoints from working.
+
+- To check runtime logs in Vercel:
+    1. In Vercel project, go to your deployment
+    2. Click the "Runtime Logs" tab
+    3. Look for errors relating to `MONGODB`, `ENODATA`, `MongoNetworkError`, or `Authentication failed`.
+
+
 
 ## Vercel Deployment - Peer dependency issue & workaround
 
@@ -224,6 +253,21 @@ npm run dev
     - Another CLI workaround for CI is to use `npm install --legacy-peer-deps` if you do not want to use `.npmrc`.
 
 Make sure to configure required Vercel environment variables: `MONGODB_URI`, `JWT_SECRET`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD`.
+
+### Vercel deployment (monorepo)
+
+This repo includes a monorepo setup with `frontend` and `backend` folders. The `api` folder at the root contains a serverless entrypoint that exports the Express app from `backend/app.js` so Vercel can run it as a serverless function.
+
+1) Create a new Vercel project from this Git repository.
+2) In Vercel project Settings > Environment Variables, add the following (Production/Staging as necessary):
+    - `MONGODB_URI` (MongoDB Atlas URI)
+    - `JWT_SECRET` (JWT secret)
+    - `ADMIN_USERNAME`, `ADMIN_PASSWORD` (optional for seeding the admin user)
+    - `CLIENT_ORIGIN` (frontend origin for CORS)
+3) You can use `SKIP_DB` to opt-out of DB access for a deployment (for testing only). DO NOT use `SKIP_DB=true` in production.
+4) The repo includes a `vercel.json` configuration which instructs Vercel to use `@vercel/static-build` for the `frontend` and `@vercel/node` for the `api` serverless functions, and to route `/api/*` requests to the serverless function.
+
+Note: Vercel uses serverless functions; each request may run in a cold container, so we've added a guard to reuse Mongoose connection state where possible (`mongoose.connection.readyState`) and to avoid blocking `app.listen()` in serverless environments. Ensure `MONGODB_URI` points to a stable Atlas cluster that allows the Vercel lambda space to connect (add IP 0.0.0.0/0 in Atlas Network Access or set a VPC peering if needed for security).
 
 
 ## End-to-end & Unit Testing

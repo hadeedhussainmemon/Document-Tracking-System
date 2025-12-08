@@ -36,9 +36,25 @@ app.get('/', (req, res) => {
     res.send('Document Tracking System API');
 });
 
+// Health endpoint for uptime / runtime checks (does not require DB to return a 200)
+app.get('/health', (req, res) => {
+    return res.json({ status: 'ok', time: new Date().toISOString() });
+});
+
 // Basic env checks
 if (!process.env.JWT_SECRET) {
     console.warn('Warning: JWT_SECRET is not set. Login/register will fail until it is configured. Set JWT_SECRET in the backend .env.');
+}
+
+// Environment toggles
+const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.FUNCTIONS_WORKER_RUNTIME);
+const skipDB = ((process.env.SKIP_DB || '').toLowerCase() === 'true') || (process.env.SKIP_DB === '1');
+
+if (skipDB) console.log('SKIP_DB=true: Skipping MongoDB connect and admin creation (useful for local dev without DB)');
+if (isServerless) console.log('Serverless runtime detected: skipping app.listen and admin creation');
+
+if (!skipDB && !process.env.MONGODB_URI) {
+    console.warn('WARNING: MONGODB_URI is not set and SKIP_DB is false. Server will attempt to connect and likely fail.');
 }
 
 // Basic error handling middleware
@@ -48,9 +64,12 @@ app.use((err, req, res, next) => {
 });
 
 
-mongoose.connect(process.env.MONGODB_URI)
-    .then(() => {
-        // Ensure admin user exists if environment variables are present
+if (!skipDB) {
+    // Avoid reconnecting if we already have an open connection (serverless containers may reuse state)
+    if (mongoose.connection.readyState !== 1) {
+        mongoose.connect(process.env.MONGODB_URI)
+        .then(() => {
+            // Ensure admin user exists if environment variables are present
         const ensureAdminUser = async () => {
             try {
                 const User = require('./models/User');
@@ -90,16 +109,33 @@ mongoose.connect(process.env.MONGODB_URI)
             }
         };
 
-        if (process.env.NODE_ENV !== 'test') {
-            ensureAdminUser();
-            app.listen(PORT, () => {
-                console.log(`Server is running on port ${PORT}`);
-            });
-        }
-    })
-    .catch(err => {
-        console.error('Database connection error:', err);
-    });
+            if (!isServerless && process.env.NODE_ENV !== 'test') {
+                ensureAdminUser();
+                app.listen(PORT, () => {
+                    console.log(`Server is running on port ${PORT}`);
+                });
+            } else {
+                // When serverless we don't call app.listen(); Vercel/other platforms will handle routing
+                if (process.env.NODE_ENV !== 'test') {
+                    console.log('Not starting express server because we are in a serverless environment');
+                }
+            }
+        })
+        .catch(err => {
+            console.error('Database connection error:', err);
+        });
+    } else {
+        console.log('Using existing MongoDB connection (mongoose.connection.readyState=1)');
+    }
+} else {
+    // SKIP_DB = true
+    console.log('SKIP_DB=true: Not attempting MongoDB connection. Some features will be disabled.');
+    if (!isServerless && process.env.NODE_ENV !== 'test') {
+        app.listen(PORT, () => {
+            console.log(`Server is running on port ${PORT} (SKIP_DB=true)`);
+        });
+    }
+}
 
 module.exports = app;
 
@@ -111,5 +147,7 @@ process.on('unhandledRejection', (reason, promise) => {
 process.on('uncaughtException', (err) => {
     console.error('Uncaught Exception thrown:', err);
     // recommended to exit process after logging
-    process.exit(1);
+    if (!isServerless) {
+        process.exit(1);
+    }
 });
