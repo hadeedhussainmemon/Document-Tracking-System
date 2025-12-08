@@ -66,11 +66,15 @@ app.use((err, req, res, next) => {
 
 if (!skipDB) {
     // Avoid reconnecting if we already have an open connection (serverless containers may reuse state)
-    if (mongoose.connection.readyState !== 1) {
-        mongoose.connect(process.env.MONGODB_URI)
-        .then(() => {
-            // Ensure admin user exists if environment variables are present
-        const ensureAdminUser = async () => {
+    if (mongoose.connection.readyState === 0) {
+        // Not connected, initiate connection (don't wait for it in serverless)
+        mongoose.connect(process.env.MONGODB_URI).catch(err => {
+            console.error('MongoDB connection failed:', err);
+        });
+    }
+    
+    // Ensure admin user exists if environment variables are present (async, non-blocking)
+    const ensureAdminUser = async () => {
             try {
                 const User = require('./models/User');
                 const bcrypt = require('bcryptjs');
@@ -109,23 +113,21 @@ if (!skipDB) {
             }
         };
 
-            if (!isServerless && process.env.NODE_ENV !== 'test') {
-                ensureAdminUser();
-                app.listen(PORT, () => {
-                    console.log(`Server is running on port ${PORT}`);
-                });
-            } else {
-                // When serverless we don't call app.listen(); Vercel/other platforms will handle routing
-                if (process.env.NODE_ENV !== 'test') {
-                    console.log('Not starting express server because we are in a serverless environment');
-                }
-            }
-        })
-        .catch(err => {
-            console.error('Database connection error:', err);
+    if (!isServerless && process.env.NODE_ENV !== 'test') {
+        // Only wait for DB and start server in non-serverless environments
+        mongoose.connection.once('open', () => {
+            console.log('MongoDB connected');
+            ensureAdminUser();
         });
-    } else {
-        console.log('Using existing MongoDB connection (mongoose.connection.readyState=1)');
+        app.listen(PORT, () => {
+            console.log(`Server is running on port ${PORT}`);
+        });
+    } else if (isServerless) {
+        // In serverless, admin creation happens lazily on first request after DB connects
+        mongoose.connection.once('open', () => {
+            console.log('MongoDB connected in serverless');
+            ensureAdminUser().catch(err => console.error('Admin creation error:', err));
+        });
     }
 } else {
     // SKIP_DB = true
