@@ -1,0 +1,70 @@
+# Node
+node_modules/
+**/node_modules/
+
+# Build outputs
+/frontend/dist/
+/frontend/build/
+/backend/dist/
+/backend/build/
+dist/
+build/
+
+# Vite / static
+/public/*
+!.gitkeep
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+logs/
+*.log
+
+# System files / IDE
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Editor backups
+*.bak
+*.tmp
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Dependency directories
+/frontend/node_modules/
+/backend/node_modules/
+
+# Test and coverage
+/coverage/
+.nyc_output/
+test-results/
+/.jest/
+
+# Generated files
+*.pem
+*.key
+
+# OS
+ehthumbs.db
+Icon?
+
+# Misc
+.cache
+/.parcel-cache
+/.pnp*
+
+# Temporary Mongo test databases
+mongo-data/
