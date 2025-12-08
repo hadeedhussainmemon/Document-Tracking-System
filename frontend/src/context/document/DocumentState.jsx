@@ -31,7 +31,7 @@ const DocumentState = props => {
     const getDocuments = async ({ page = 1, limit = 20, filters = {} } = {}) => {
         try {
             const params = { page, limit, ...filters };
-            const res = await axios.get('/api/documents', { params });
+            const res = await axios.get('/documents', { params });
 
             dispatch({
                 type: GET_DOCUMENTS,
@@ -54,7 +54,7 @@ const DocumentState = props => {
         };
 
         try {
-            const res = await axios.post('/api/documents', document, config);
+            const res = await axios.post('/documents', document, config);
 
             dispatch({
                 type: ADD_DOCUMENT,
@@ -72,7 +72,7 @@ const DocumentState = props => {
     const forwardDocument = async (id, toUserId, role = 'viewer') => {
         const config = { headers: { 'Content-Type': 'application/json' } };
         try {
-            const res = await axios.post(`/api/documents/${id}/forward`, { toUserId, role }, config);
+            const res = await axios.post(`/documents/${id}/forward`, { toUserId, role }, config);
             dispatch({ type: UPDATE_DOCUMENT, payload: res.data });
         } catch (err) {
             const errorMsg = err.response?.data?.msg || 'Server Error';
@@ -83,7 +83,7 @@ const DocumentState = props => {
     // Export Documents (server side) - accepts ids or filters
     const exportDocuments = async (data) => {
         try {
-            const res = await axios.post('/api/documents/export', data, { responseType: 'blob' });
+            const res = await axios.post('/documents/export', data, { responseType: 'blob' });
             return res.data;
         } catch (err) {
             const errorMsg = err.response?.data?.msg || 'Server Error';
@@ -94,7 +94,7 @@ const DocumentState = props => {
     // Bulk Action
     const bulkAction = async (action, ids, payload) => {
         try {
-            const res = await axios.post('/api/documents/bulk', { action, ids, payload });
+            const res = await axios.post('/documents/bulk', { action, ids, payload });
             // Optionally refresh documents
             getDocuments();
             return res.data;
@@ -107,7 +107,7 @@ const DocumentState = props => {
     // Delete Document
     const deleteDocument = async id => {
         try {
-            await axios.delete(`/api/documents/${id}`);
+            await axios.delete(`/documents/${id}`);
 
             dispatch({
                 type: DELETE_DOCUMENT,
@@ -133,7 +133,7 @@ const DocumentState = props => {
         };
 
         try {
-            const res = await axios.put(`/api/documents/${document._id}`, document, config);
+            const res = await axios.put(`/documents/${document._id}`, document, config);
 
             dispatch({
                 type: UPDATE_DOCUMENT,
@@ -150,7 +150,7 @@ const DocumentState = props => {
     // Get Document
     const getDocument = async (id, { skipRefresh = false } = {}) => {
         try {
-            const res = await axios.get(`/api/documents/${id}`);
+            const res = await axios.get(`/documents/${id}`);
 
             dispatch({
                 type: GET_DOCUMENT,

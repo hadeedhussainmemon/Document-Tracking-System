@@ -45,7 +45,7 @@ const DocumentForm = () => {
         // fetch heads for assignment dropdown
         const fetchHeads = async () => {
             try {
-                const res = await (await import('axios')).default.get('/api/users/heads');
+                const res = await (await import('axios')).default.get('/users/heads');
                 setHeads(res.data.users || []);
             } catch (err) {
                 console.error('Failed to load heads', err);

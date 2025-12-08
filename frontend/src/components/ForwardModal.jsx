@@ -10,7 +10,7 @@ const ForwardModal = ({ isOpen, onClose, onConfirm }) => {
     useEffect(() => {
         const fetchHeads = async () => {
             try {
-                const res = await axios.get('/api/users/heads');
+                const res = await axios.get('/users/heads');
                 setHeads(res.data.users || []);
             } catch (err) { console.error(err); }
         };

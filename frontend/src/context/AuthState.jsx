@@ -38,7 +38,7 @@ const AuthState = props => {
         }
 
         try {
-            const res = await axios.get('/api/auth');
+            const res = await axios.get('/auth');
 
             dispatch({
                 type: USER_LOADED,
@@ -65,7 +65,7 @@ const AuthState = props => {
         };
 
         try {
-            const res = await axios.post('/api/auth/register', formData, config);
+            const res = await axios.post('/auth/register', formData, config);
 
             dispatch({
                 type: REGISTER_SUCCESS,
@@ -92,7 +92,7 @@ const AuthState = props => {
         };
 
         try {
-            const res = await axios.post('/api/auth/login', formData, config);
+            const res = await axios.post('/auth/login', formData, config);
 
             dispatch({
                 type: LOGIN_SUCCESS,
@@ -120,7 +120,7 @@ const AuthState = props => {
         };
 
         try {
-            const res = await axios.post('/api/auth/create', formData, config);
+            const res = await axios.post('/auth/create', formData, config);
             // Optionally return data for UI
             return { success: true, data: res.data };
         } catch (err) {

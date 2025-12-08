@@ -36,7 +36,7 @@ const AdminUsers = () => {
         const fetchLogs = async () => {
             setLoadingHistory(true);
             try {
-                const res = await axios.get('/api/auditlogs', { params: { targetId: historyUserId } });
+                const res = await axios.get('/auditlogs', { params: { targetId: historyUserId } });
                 setHistoryLogs(res.data);
             } catch (err) {
                 console.error(err);
@@ -50,7 +50,7 @@ const AdminUsers = () => {
     const loadUsers = useCallback(async (p = page) => {
         setLoading(true);
         try {
-            const res = await axios.get('/api/users', { params: { page: p, limit, search, role: roleFilter } });
+            const res = await axios.get('/users', { params: { page: p, limit, search, role: roleFilter } });
             const { users: data, total, page: curPage, totalPages: tp } = res.data;
             setUsers(data);
             setPage(curPage);
@@ -71,7 +71,7 @@ const AdminUsers = () => {
 
     const onDelete = async id => {
         try {
-            await axios.delete(`/api/users/${id}`);
+            await axios.delete(`/users/${id}`);
             setAlert('User deleted', 'success');
             await loadUsers();
         } catch (err) {
@@ -82,7 +82,7 @@ const AdminUsers = () => {
 
     const onSaveEdit = async (id, data) => {
         try {
-            await axios.put(`/api/users/${id}`, data);
+            await axios.put(`/users/${id}`, data);
             setAlert('User updated', 'success');
             setEditUser(null);
             await loadUsers();
@@ -234,7 +234,7 @@ const AdminUsers = () => {
                     <Button variant='primary' onClick={async () => {
                         setBackfillLoading(true);
                         try {
-                            const res = await axios.post('/api/admin/backfill');
+                            const res = await axios.post('/admin/backfill');
                             setBackfillConfirmOpen(false);
                             setBackfillLoading(false);
                             setAlert(`Backfill completed, updated ${res.data.updatedCount} documents`, 'success');
