@@ -180,6 +180,42 @@ The frontend will be available at `http://localhost:5173` (or the next available
 - If the login call receives a 400 (invalid credentials): confirm the admin user exists. The server will attempt to create an admin from `ADMIN_USERNAME`/`ADMIN_PASSWORD` env variables on startup. Check backend logs to confirm admin creation.
 - If account is locked, the server will respond with 403 and a message including lock expiration time. Reset `failedLoginAttempts` if necessary in the database or wait for lockUntil to expire.
 
+## Database connectivity check (quick test)
+
+If the backend cannot connect to MongoDB (e.g., `ENODATA` or `MongoNetworkError`), use this quick test locally to diagnose the problem.
+
+1) Add `MONGODB_URI` to `backend/.env` or pass connection string as an argument:
+```powershell
+cd backend
+set MONGODB_URI="mongodb+srv://user:pass@cluster-host/my-db"
+npm run test-db-connect
+```
+
+or:
+```powershell
+cd backend
+npm run test-db-connect "mongodb+srv://user:pass@cluster-host/my-db"
+```
+
+2) Script output helps identify common errors:
+    - `MongoParseError`: connection string format is invalid (percent-encode special characters in the password)
+    - `ENOTFOUND`: DNS lookup failed (check Atlas cluster host name)
+    - `MongoNetworkError`: network problem (check Atlas IP whitelist / network settings)
+    - Authenticaton errors indicate wrong username/password
+
+3) When testing with Atlas:
+    - Ensure the Atlas cluster host is correct in the URI
+    - Confirm Atlas cluster is running
+    - Add the IP where the request originates (or 0.0.0.0/0 for dev) in Atlas Network Access
+
+4) If you prefer not to use Atlas during frontend dev, you can run a local Mongo instance:
+```powershell
+docker run -d --name dt-mongo -p 27017:27017 mongo:6.0
+set MONGODB_URI="mongodb://localhost:27017/docs-tracker"
+npm run dev
+```
+
+
 ## Vercel Deployment - Peer dependency issue & workaround
 
     - Short-term (quick fix): Add a `.npmrc` with `legacy-peer-deps=true` to the frontend project (or repo root). This will allow `npm` to install dependencies without failing on strict peer dependency conflicts. This repo contains such `.npmrc` files.
