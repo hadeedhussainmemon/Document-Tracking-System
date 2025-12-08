@@ -173,7 +173,7 @@ describe('Users API', () => {
         // Normal user should receive 403
         const createNormal = await request(app).post('/auth/create').set('x-auth-token', token).send({ username: 'normal1', password: 'pass123', role: 'user' });
         expect(createNormal.statusCode).toBe(201);
-        const userRes = await request(app).post('/api/auth/login').send({ username: 'normal1', password: 'pass123' });
+        const userRes = await request(app).post('/auth/login').send({ username: 'normal1', password: 'pass123' });
         const userToken = userRes.body.token;
         const resUser = await request(app).post('/auth/register').set('x-auth-token', userToken).send({ username: 't1', password: 'pass123' });
         expect(resUser.statusCode).toBe(403);

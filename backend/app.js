@@ -24,7 +24,13 @@ const adminRoutes = require('./routes/admin');
 
 app.use(express.json());
 // Enable CORS for development client; use an environment variable to lock down in production
-app.use(cors({ origin: process.env.CLIENT_ORIGIN || '*' }));
+// Enable CORS for development client; use an environment variable to lock down in production
+// Explicitly allow x-auth-token header used by the client and common HTTP methods.
+app.use(cors({ 
+    origin: process.env.CLIENT_ORIGIN || '*',
+    methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+    allowedHeaders: ['Content-Type','x-auth-token','Authorization']
+}));
 
 app.use('/auth', authRoutes);
 app.use('/documents', documentRoutes);
