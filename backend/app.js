@@ -37,7 +37,7 @@ app.get('/', (req, res) => {
 });
 
 // Health endpoint for uptime / runtime checks (does not require DB to return a 200)
-app.get('/health', (req, res) => {
+app.get('/api/health', (req, res) => {
     return res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
