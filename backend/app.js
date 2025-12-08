@@ -26,18 +26,18 @@ app.use(express.json());
 // Enable CORS for development client; use an environment variable to lock down in production
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || '*' }));
 
-app.use('/api/auth', authRoutes);
-app.use('/api/documents', documentRoutes);
-app.use('/api/users', usersRoutes);
-app.use('/api/auditlogs', auditLogRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/auth', authRoutes);
+app.use('/documents', documentRoutes);
+app.use('/users', usersRoutes);
+app.use('/auditlogs', auditLogRoutes);
+app.use('/admin', adminRoutes);
 
 app.get('/', (req, res) => {
     res.send('Document Tracking System API');
 });
 
 // Health endpoint for uptime / runtime checks (does not require DB to return a 200)
-app.get('/api/health', (req, res) => {
+app.get('/health', (req, res) => {
     return res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
