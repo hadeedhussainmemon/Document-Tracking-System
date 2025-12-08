@@ -180,6 +180,15 @@ The frontend will be available at `http://localhost:5173` (or the next available
 - If the login call receives a 400 (invalid credentials): confirm the admin user exists. The server will attempt to create an admin from `ADMIN_USERNAME`/`ADMIN_PASSWORD` env variables on startup. Check backend logs to confirm admin creation.
 - If account is locked, the server will respond with 403 and a message including lock expiration time. Reset `failedLoginAttempts` if necessary in the database or wait for lockUntil to expire.
 
+## Vercel Deployment - Peer dependency issue & workaround
+
+    - Short-term (quick fix): Add a `.npmrc` with `legacy-peer-deps=true` to the frontend project (or repo root). This will allow `npm` to install dependencies without failing on strict peer dependency conflicts. This repo contains such `.npmrc` files.
+    - Long-term (recommended): Update libraries and dev dependencies to versions compatible with React 19 (or pin `react` and `react-dom` to React 18 if libraries are not yet ready). Updating `@testing-library/react` or similar libraries may fix the conflicts.
+        - Long-term (recommended): Update libraries and dev dependencies to versions compatible with React 19 (e.g., testing-library, other libraries). The changes above attempt this by bumping `@testing-library/react` and `@testing-library/jest-dom` to versions that are expected to support React 19.
+    - Another CLI workaround for CI is to use `npm install --legacy-peer-deps` if you do not want to use `.npmrc`.
+
+Make sure to configure required Vercel environment variables: `MONGODB_URI`, `JWT_SECRET`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD`.
+
 
 ## End-to-end & Unit Testing
 
