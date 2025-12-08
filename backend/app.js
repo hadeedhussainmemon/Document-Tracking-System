@@ -57,23 +57,29 @@ if (!skipDB && !process.env.MONGODB_URI) {
     console.warn('WARNING: MONGODB_URI is not set and SKIP_DB is false. Server will attempt to connect and likely fail.');
 }
 
-// Basic error handling middleware
-app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).send('Something broke!');
-});
 
-
+// Initialize DB connection asynchronously (non-blocking for serverless)
 if (!skipDB) {
-    // Avoid reconnecting if we already have an open connection (serverless containers may reuse state)
-    if (mongoose.connection.readyState === 0) {
-        // Not connected, initiate connection (don't wait for it in serverless)
-        mongoose.connect(process.env.MONGODB_URI).catch(err => {
-            console.error('MongoDB connection failed:', err);
-        });
-    }
+    const connectDB = async () => {
+        if (mongoose.connection.readyState === 0) {
+            try {
+                await mongoose.connect(process.env.MONGODB_URI, {
+                    serverSelectionTimeoutMS: 5000,
+                    socketTimeoutMS: 45000,
+                });
+                console.log('MongoDB connected');
+                
+                // Create admin user after connection
+                if (process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD) {
+                    await ensureAdminUser();
+                }
+            } catch (err) {
+                console.error('MongoDB connection failed:', err.message);
+            }
+        }
+    };
     
-    // Ensure admin user exists if environment variables are present (async, non-blocking)
+    // Ensure admin user exists if environment variables are present
     const ensureAdminUser = async () => {
             try {
                 const User = require('./models/User');
@@ -113,32 +119,26 @@ if (!skipDB) {
             }
         };
 
-    if (!isServerless && process.env.NODE_ENV !== 'test') {
-        // Only wait for DB and start server in non-serverless environments
-        mongoose.connection.once('open', () => {
-            console.log('MongoDB connected');
-            ensureAdminUser();
-        });
-        app.listen(PORT, () => {
-            console.log(`Server is running on port ${PORT}`);
-        });
-    } else if (isServerless) {
-        // In serverless, admin creation happens lazily on first request after DB connects
-        mongoose.connection.once('open', () => {
-            console.log('MongoDB connected in serverless');
-            ensureAdminUser().catch(err => console.error('Admin creation error:', err));
-        });
-    }
+    // Start DB connection in background (non-blocking)
+    connectDB();
 } else {
-    // SKIP_DB = true
-    console.log('SKIP_DB=true: Not attempting MongoDB connection. Some features will be disabled.');
-    if (!isServerless && process.env.NODE_ENV !== 'test') {
-        app.listen(PORT, () => {
-            console.log(`Server is running on port ${PORT} (SKIP_DB=true)`);
-        });
-    }
+    console.log('SKIP_DB=true: Not attempting MongoDB connection.');
 }
 
+// Start local server only if not serverless and not in test mode
+if (!isServerless && process.env.NODE_ENV !== 'test') {
+    app.listen(PORT, () => {
+        console.log(`Server is running on port ${PORT}`);
+    });
+}
+
+// Error handling middleware (must be after routes)
+app.use((err, req, res, next) => {
+    console.error('Error:', err.stack);
+    res.status(500).json({ error: 'Something broke!', message: err.message });
+});
+
+// Export app immediately - don't wait for DB
 module.exports = app;
 
 // Global error handlers to log unhandled exceptions and rejections
