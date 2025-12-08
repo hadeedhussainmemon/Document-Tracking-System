@@ -93,6 +93,8 @@ const AuthState = props => {
 
         try {
             const res = await axios.post('/auth/login', formData, config);
+            // debug log for production signin issues
+            if (import.meta.env.DEV) console.log('login response:', res.data);
 
             dispatch({
                 type: LOGIN_SUCCESS,
@@ -104,6 +106,7 @@ const AuthState = props => {
 
             loadUser();
         } catch (err) {
+            if (import.meta.env.DEV) console.error('login error:', err.response?.data || err.message);
             dispatch({
                 type: LOGIN_FAIL,
                 payload: err.response?.data?.msg || (err.response?.data?.errors && err.response.data.errors[0]?.msg) || 'Server Error'

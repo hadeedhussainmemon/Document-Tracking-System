@@ -67,6 +67,17 @@ app.use((req, res, next) => {
     next();
 });
 
+// Temporary request logging for debugging. Logs method, path, and origin header.
+// WARNING: This should be removed in production or gated behind a DEBUG env var.
+if (process.env.DEBUG_REQUESTS === 'true') {
+    app.use((req, res, next) => {
+        try {
+            console.log(`REQ: ${req.method} ${req.originalUrl} Origin: ${req.headers['origin'] || 'none'}`);
+        } catch (e) {}
+        next();
+    });
+}
+
 app.use('/auth', authRoutes);
 app.use('/documents', documentRoutes);
 app.use('/users', usersRoutes);
