@@ -1,16 +1,8 @@
 {
-  "version": 2,
-  "name": "document-tracking-backend",
-  "builds": [
+  "rewrites": [
     {
-      "src": "api/**/*.js",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/api/[...path]"
+      "source": "/(.*)",
+      "destination": "/api/[...path]"
     }
   ]
 }
