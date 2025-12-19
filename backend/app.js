@@ -7,10 +7,11 @@ dotenv.config();
 
 const app = express();
 
+// Trust proxy is required for rate limiters to work correctly behind Vercel/proxies
+app.set('trust proxy', 1);
+
 // --- CORS Configuration (TOP PRIORITY) ---
 // Enable CORS for development client; use an environment variable to lock down in production
-// Explicitly allow x-auth-token header used by the client and common HTTP methods.
-// CORS: whitelist origins from CLIENT_ORIGIN (comma-separated env var) and allow credentials
 const defaultOrigins = [
     'http://localhost:3000',
     'http://localhost:5173',
@@ -28,7 +29,7 @@ const clientOrigins = rawClientOrigin
         return orig;
     });
 
-// Always include default origins to prevent production lockouts if env var is missing or partial
+// Always include default origins
 defaultOrigins.forEach(origin => {
     if (!clientOrigins.includes(origin)) {
         clientOrigins.push(origin);
@@ -37,10 +38,16 @@ defaultOrigins.forEach(origin => {
 
 const corsOptions = {
     origin: (origin, callback) => {
-        // If incoming request has no origin (curl, server-to-server), allow it
+        // If incoming request has no origin (server-to-server), allow it
         if (!origin) return callback(null, true);
 
+        // Allow exact matches
         if (clientOrigins.includes(origin)) return callback(null, true);
+
+        // Allow any Vercel preview/deployment URL to avoid constant configuration issues
+        if (origin.endsWith('.vercel.app')) {
+            return callback(null, true);
+        }
 
         console.warn('Blocked CORS request from origin', origin);
         return callback(new Error('Origin not allowed by CORS'));
@@ -48,10 +55,12 @@ const corsOptions = {
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'x-auth-token', 'Authorization', 'Accept'],
     credentials: true,
-    optionsSuccessStatus: 200
+    optionsSuccessStatus: 200 // Some legacy browsers (IE11, various SmartTVs) choke on 204
 };
 
+// Enable CORS for all routes and explicitly for OPTIONS preflight
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 // --- End CORS Configuration ---
 
 

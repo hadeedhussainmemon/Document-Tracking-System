@@ -14,14 +14,15 @@ if (apiBase && !apiBase.startsWith('http://') && !apiBase.startsWith('https://')
   apiBase = 'https://' + apiBase;
 }
 // If a base is set (production/staging backend), make sure it calls the API path
+// If a base is set (production/staging backend), make sure it calls the API path
 if (apiBase) {
-  // Do not duplicate /api prefix
-  if (!/\/api($|\/)/.test(apiBase)) {
-    apiBase = apiBase.replace(/\/$/, '');
+  // Ensure it ends with /api
+  if (!apiBase.endsWith('/api')) {
+    apiBase = apiBase.replace(/\/$/, '') + '/api';
   }
 } else {
   // In development, use /api as the base so Vite can proxy requests to the backend
-  apiBase = import.meta.env.DEV ? '' : '';
+  apiBase = '/api'; // Fixed: was empty string or mishandled
 }
 
 axios.defaults.baseURL = apiBase;
