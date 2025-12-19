@@ -73,11 +73,6 @@ const backfillPerformedByName = async (req, res) => {
     }
 };
 
-module.exports = {
-    backfillPerformedByName,
-    getAuditLogs,
-    getAuditLogsExport
-};
 
 const AuditLog = require('../models/AuditLog');
 
@@ -133,4 +128,10 @@ const getAuditLogsExport = async (req, res) => {
         console.error(err.message);
         res.status(500).send('Server Error');
     }
+}
+
+module.exports = {
+    backfillPerformedByName,
+    getAuditLogs,
+    getAuditLogsExport
 };

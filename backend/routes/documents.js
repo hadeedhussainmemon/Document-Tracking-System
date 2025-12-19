@@ -8,9 +8,15 @@ const {
     updateDocument,
     deleteDocument,
     getStats,
-    addComment
+    addComment,
+    getDocumentById,
+    submitDocument,
+    approveDocument,
+    rejectDocument,
+    forwardDocument,
+    exportDocuments,
+    bulkAction
 } = require('../controllers/documents');
-const { forwardDocument, exportDocuments, bulkAction } = require('../controllers/documents');
 
 // Validation middleware for document creation and update
 const documentValidation = [
