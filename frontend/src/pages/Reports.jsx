@@ -29,7 +29,7 @@ const Reports = () => {
             if (filters.owner) params.owner = filters.owner;
             // For exportDocuments, we can pass filters as body
 
-            const res = await axios.post('/api/documents/export', {
+            const res = await axios.post('/documents/export', {
                 filters: {
                     ...filters
                     // date handling might need check in backend exportDocuments

@@ -12,7 +12,7 @@ const CommentsSection = ({ documentId, comments = [], currentUser }) => {
 
         setLoading(true);
         try {
-            const res = await axios.post(`/api/documents/${documentId}/comments`, { text });
+            const res = await axios.post(`/documents/${documentId}/comments`, { text });
             // API returns the updated comments array
             setLocalComments(res.data);
             setText('');
@@ -74,8 +74,8 @@ const CommentsSection = ({ documentId, comments = [], currentUser }) => {
                         type="submit"
                         disabled={loading || !text.trim()}
                         className={`px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors ${loading || !text.trim()
-                                ? 'bg-indigo-300 cursor-not-allowed'
-                                : 'bg-indigo-600 hover:bg-indigo-700 shadow-sm'
+                            ? 'bg-indigo-300 cursor-not-allowed'
+                            : 'bg-indigo-600 hover:bg-indigo-700 shadow-sm'
                             }`}
                     >
                         {loading ? 'Posting...' : 'Post Comment'}

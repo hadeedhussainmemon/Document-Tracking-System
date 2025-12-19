@@ -35,7 +35,7 @@ const DocumentPage = () => {
 
     const submitDoc = async () => {
         try {
-            await axios.put(`/api/documents/${document._id}/submit`);
+            await axios.put(`/documents/${document._id}/submit`);
             getDocument(id);
         } catch (err) {
             setAlert(err.response?.data?.msg || 'Submission failed', 'danger');
@@ -44,7 +44,7 @@ const DocumentPage = () => {
 
     const approveDoc = async () => {
         try {
-            await axios.put(`/api/documents/${document._id}/approve`);
+            await axios.put(`/documents/${document._id}/approve`);
             getDocument(id);
         } catch (err) {
             setAlert(err.response?.data?.msg || 'Approval failed', 'danger');
@@ -55,7 +55,7 @@ const DocumentPage = () => {
         const reason = window.prompt('Enter rejection reason:');
         if (reason === null) return;
         try {
-            await axios.put(`/api/documents/${document._id}/reject`, { reason });
+            await axios.put(`/documents/${document._id}/reject`, { reason });
             getDocument(id);
         } catch (err) {
             setAlert(err.response?.data?.msg || 'Rejection failed', 'danger');

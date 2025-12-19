@@ -20,7 +20,7 @@ const ActivityLogs = () => {
     const fetchLogs = async (pageNum) => {
         setLoading(true);
         try {
-            const res = await axios.get(`/api/admin/logs?page=${pageNum}&limit=50`);
+            const res = await axios.get(`/admin/logs?page=${pageNum}&limit=50`);
             setLogs(res.data.logs);
             setTotalPages(res.data.totalPages);
             setLoading(false);
@@ -32,7 +32,7 @@ const ActivityLogs = () => {
 
     const downloadCsv = async () => {
         try {
-            const res = await axios.get('/api/admin/logs/export', { responseType: 'blob' });
+            const res = await axios.get('/admin/logs/export', { responseType: 'blob' });
             const url = window.URL.createObjectURL(new Blob([res.data]));
             const link = document.createElement('a');
             link.href = url;
@@ -58,7 +58,7 @@ const ActivityLogs = () => {
                     <div className="flex justify-between items-center mb-6">
                         <h1 className="text-3xl font-bold text-gray-900">System Activity Logs</h1>
                         <a
-                            href={`/api/admin/logs/export?token=${localStorage.getItem('token')}`} // Since it's a direct link, we'd need to handle auth token in query or use axios blob download. Direct link is simpler if token is in cookie or not required for simple test, but this is protected backend. Let's use a function.
+                            href={`/admin/logs/export?token=${localStorage.getItem('token')}`} // Since it's a direct link, we'd need to handle auth token in query or use axios blob download. Direct link is simpler if token is in cookie or not required for simple test, but this is protected backend. Let's use a function.
                             className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm font-medium"
                             onClick={(e) => {
                                 e.preventDefault();

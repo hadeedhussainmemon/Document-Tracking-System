@@ -12,50 +12,15 @@ app.set('trust proxy', 1);
 
 // --- CORS Configuration (TOP PRIORITY) ---
 // Enable CORS for development client; use an environment variable to lock down in production
-const defaultOrigins = [
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'https://document-tracking-system-phi.vercel.app'
-];
-
-const rawClientOrigin = (process.env.CLIENT_ORIGIN || '').toString();
-const clientOrigins = rawClientOrigin
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean)
-    .map(orig => {
-        // Normalize origins so both 'example.com' and 'https://example.com' work
-        if (!/^https?:\/\//i.test(orig)) return `https://${orig}`;
-        return orig;
-    });
-
-// Always include default origins
-defaultOrigins.forEach(origin => {
-    if (!clientOrigins.includes(origin)) {
-        clientOrigins.push(origin);
-    }
-});
-
 const corsOptions = {
     origin: (origin, callback) => {
-        // If incoming request has no origin (server-to-server), allow it
-        if (!origin) return callback(null, true);
-
-        // Allow exact matches
-        if (clientOrigins.includes(origin)) return callback(null, true);
-
-        // Allow any Vercel preview/deployment URL to avoid constant configuration issues
-        if (origin.endsWith('.vercel.app')) {
-            return callback(null, true);
-        }
-
-        console.warn('Blocked CORS request from origin', origin);
-        return callback(new Error('Origin not allowed by CORS'));
+        // Allow all origins for now to eliminate CORS as the issue
+        return callback(null, true);
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'x-auth-token', 'Authorization', 'Accept'],
     credentials: true,
-    optionsSuccessStatus: 200 // Some legacy browsers (IE11, various SmartTVs) choke on 204
+    optionsSuccessStatus: 200
 };
 
 // Enable CORS for all routes and explicitly for OPTIONS preflight
@@ -227,6 +192,11 @@ if (!isServerless && process.env.NODE_ENV !== 'test') {
 // Error handling middleware (must be after routes)
 app.use((err, req, res, next) => {
     console.error('Error:', err.stack);
+    // Explicitly add CORS headers to error response to ensure frontend can read the error
+    res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
+    res.header("Access-Control-Allow-Headers", "Content-Type, x-auth-token, Authorization, Accept");
+    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+
     res.status(500).json({ error: 'Something broke!', message: err.message });
 });
 
