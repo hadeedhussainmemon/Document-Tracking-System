@@ -45,6 +45,12 @@ app.use(limiter);
 // Enable CORS for development client; use an environment variable to lock down in production
 // Explicitly allow x-auth-token header used by the client and common HTTP methods.
 // CORS: whitelist origins from CLIENT_ORIGIN (comma-separated env var) and allow credentials
+const defaultOrigins = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://document-tracking-system-phi.vercel.app'
+];
+
 const rawClientOrigin = (process.env.CLIENT_ORIGIN || '').toString();
 const clientOrigins = rawClientOrigin
     .split(',')
@@ -55,6 +61,12 @@ const clientOrigins = rawClientOrigin
         if (!/^https?:\/\//i.test(orig)) return `https://${orig}`;
         return orig;
     });
+
+// If no env var set, use defaults
+if (clientOrigins.length === 0) {
+    console.log('CLIENT_ORIGIN not set, using default allowed origins');
+    clientOrigins.push(...defaultOrigins);
+}
 
 const corsOptions = {
     origin: (origin, callback) => {
@@ -91,7 +103,7 @@ if (process.env.DEBUG_REQUESTS === 'true') {
     app.use((req, res, next) => {
         try {
             console.log(`REQ: ${req.method} ${req.originalUrl} Origin: ${req.headers['origin'] || 'none'}`);
-        } catch (e) {}
+        } catch (e) { }
         next();
     });
 }
@@ -138,7 +150,7 @@ if (!skipDB) {
                     socketTimeoutMS: 45000,
                 });
                 console.log('MongoDB connected');
-                
+
                 // Create admin user after connection
                 if (process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD) {
                     await ensureAdminUser();
@@ -148,46 +160,46 @@ if (!skipDB) {
             }
         }
     };
-    
+
     // Ensure admin user exists if environment variables are present
     const ensureAdminUser = async () => {
-            try {
-                const User = require('./models/User');
-                const bcrypt = require('bcryptjs');
+        try {
+            const User = require('./models/User');
+            const bcrypt = require('bcryptjs');
 
-                const adminUsername = process.env.ADMIN_USERNAME;
-                const adminPassword = process.env.ADMIN_PASSWORD;
+            const adminUsername = process.env.ADMIN_USERNAME;
+            const adminPassword = process.env.ADMIN_PASSWORD;
 
-                if (!adminUsername || !adminPassword) {
-                    console.log('No ADMIN_USERNAME/ADMIN_PASSWORD set; skipping admin creation');
-                    return;
-                }
+            if (!adminUsername || !adminPassword) {
+                console.log('No ADMIN_USERNAME/ADMIN_PASSWORD set; skipping admin creation');
+                return;
+            }
 
-                let admin = await User.findOne({ username: adminUsername });
-                if (!admin) {
-                    const salt = await bcrypt.genSalt(10);
-                    const hashed = await bcrypt.hash(adminPassword, salt);
-                    admin = new User({ username: adminUsername, password: hashed, role: 'admin' });
+            let admin = await User.findOne({ username: adminUsername });
+            if (!admin) {
+                const salt = await bcrypt.genSalt(10);
+                const hashed = await bcrypt.hash(adminPassword, salt);
+                admin = new User({ username: adminUsername, password: hashed, role: 'admin' });
+                await admin.save();
+                console.log(`Admin user created: ${adminUsername}`);
+            } else {
+                if (admin.role !== 'admin') {
+                    admin.role = 'admin';
                     await admin.save();
-                    console.log(`Admin user created: ${adminUsername}`);
+                    console.log(`Updated existing user ${adminUsername} to admin`);
                 } else {
-                    if (admin.role !== 'admin') {
-                        admin.role = 'admin';
-                        await admin.save();
-                        console.log(`Updated existing user ${adminUsername} to admin`);
-                    } else {
-                        console.log(`Admin user already exists: ${adminUsername}`);
-                    }
-                }
-            } catch (err) {
-                if (err && err.code === 11000) {
-                    // duplicate key error - user already exists (race condition), ignore
-                    console.log('Admin user already created concurrently');
-                } else {
-                    console.error('Failed to ensure admin user:', err);
+                    console.log(`Admin user already exists: ${adminUsername}`);
                 }
             }
-        };
+        } catch (err) {
+            if (err && err.code === 11000) {
+                // duplicate key error - user already exists (race condition), ignore
+                console.log('Admin user already created concurrently');
+            } else {
+                console.error('Failed to ensure admin user:', err);
+            }
+        }
+    };
 
     // Start DB connection in background (non-blocking)
     connectDB();

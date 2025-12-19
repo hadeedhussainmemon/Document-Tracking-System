@@ -1,9 +1,9 @@
 import React, { useContext, useEffect, useState } from 'react';
 import axios from 'axios';
-import AuthContext from '../context/AuthContext';
-import Container from './ui/Container';
-import Header from './Header';
-import Footer from './Footer';
+import AuthContext from '../../context/AuthContext';
+import Container from '../ui/Container';
+import Header from '../Header';
+import Footer from '../Footer';
 
 const ActivityLogs = () => {
     const authContext = useContext(AuthContext);
