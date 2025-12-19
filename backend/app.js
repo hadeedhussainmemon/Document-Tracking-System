@@ -12,10 +12,45 @@ app.set('trust proxy', 1);
 
 // --- CORS Configuration (TOP PRIORITY) ---
 // Enable CORS for development client; use an environment variable to lock down in production
+const defaultOrigins = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://document-tracking-system-phi.vercel.app'
+];
+
+const rawClientOrigin = (process.env.CLIENT_ORIGIN || '').toString();
+const clientOrigins = rawClientOrigin
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+    .map(orig => {
+        // Normalize origins so both 'example.com' and 'https://example.com' work
+        if (!/^https?:\/\//i.test(orig)) return `https://${orig}`;
+        return orig;
+    });
+
+// Always include default origins
+defaultOrigins.forEach(origin => {
+    if (!clientOrigins.includes(origin)) {
+        clientOrigins.push(origin);
+    }
+});
+
 const corsOptions = {
     origin: (origin, callback) => {
-        // Allow all origins for now to eliminate CORS as the issue
-        return callback(null, true);
+        // If incoming request has no origin (server-to-server), allow it
+        if (!origin) return callback(null, true);
+
+        // Allow exact matches
+        if (clientOrigins.includes(origin)) return callback(null, true);
+
+        // Allow any Vercel preview/deployment URL to avoid constant configuration issues
+        if (origin.endsWith('.vercel.app')) {
+            return callback(null, true);
+        }
+
+        console.warn('Blocked CORS request from origin', origin);
+        return callback(new Error('Origin not allowed by CORS'));
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'x-auth-token', 'Authorization', 'Accept'],
@@ -25,6 +60,14 @@ const corsOptions = {
 
 // Enable CORS for all routes (middleware handles OPTIONS automatically)
 app.use(cors(corsOptions));
+
+// MANUAL OPTIONS HANDLER: Ensure preflight always succeeds immediately
+app.options('/*', (req, res) => {
+    res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
+    res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type, x-auth-token, Authorization, Accept");
+    res.sendStatus(200);
+});
 // --- End CORS Configuration ---
 
 
@@ -120,17 +163,19 @@ if (!skipDB) {
         if (mongoose.connection.readyState === 0) {
             try {
                 await mongoose.connect(process.env.MONGODB_URI, {
-                    serverSelectionTimeoutMS: 5000,
+                    serverSelectionTimeoutMS: 5000, // Fail after 5s if no connection
                     socketTimeoutMS: 45000,
+                    connectTimeoutMS: 10000, // MongoDB driver connection timeout
                 });
                 console.log('MongoDB connected');
 
-                // Create admin user after connection
+                // Create admin user after connection - don't await this if it risks blocking startup loop
                 if (process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD) {
-                    await ensureAdminUser();
+                    ensureAdminUser().catch(err => console.error('Admin creation failed:', err.message));
                 }
             } catch (err) {
                 console.error('MongoDB connection failed:', err.message);
+                // Don't exit process, allow server to run (maybe return 500s for DB routes but respond to health check)
             }
         }
     };
