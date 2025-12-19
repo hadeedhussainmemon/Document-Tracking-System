@@ -24,7 +24,7 @@ const documentSchema = new mongoose.Schema({
         timestamp: { type: Date, default: Date.now },
         details: { type: String }
     }],
-    status: { type: String, enum: ['Open', 'Closed'], default: 'Open' },
+    status: { type: String, enum: ['Draft', 'Pending Approval', 'Approved', 'Rejected', 'Open', 'Closed'], default: 'Draft' },
     closedMessage: { type: String },
     closedAt: { type: Date },
     closedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -32,6 +32,19 @@ const documentSchema = new mongoose.Schema({
         user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
         role: { type: String, enum: ['viewer', 'editor'], default: 'viewer' },
     }],
+    comments: [{
+        text: { type: String, required: true },
+        author: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        authorName: { type: String },
+        createdAt: { type: Date, default: Date.now }
+    }],
 }, { timestamps: true });
+
+documentSchema.index({ title: 'text', content: 'text' });
+// Also index tags for good measure if not already
+documentSchema.index({ tags: 1 });
+documentSchema.index({ status: 1 });
+documentSchema.index({ owner: 1 });
+documentSchema.index({ assignedTo: 1 });
 
 module.exports = mongoose.model('Document', documentSchema);

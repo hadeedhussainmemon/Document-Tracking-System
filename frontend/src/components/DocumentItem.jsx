@@ -8,7 +8,7 @@ import Button from './ui/Button';
 import DocumentTimeline from './DocumentTimeline';
 import ForwardModal from './ForwardModal';
 
-const DocumentItem = ({ document, selectable = false, checked = false, onToggle = () => {} }) => {
+const DocumentItem = ({ document, selectable = false, checked = false, onToggle = () => { } }) => {
     const documentContext = useContext(DocumentContext);
     const authContext = useContext(AuthContext);
 
@@ -34,7 +34,7 @@ const DocumentItem = ({ document, selectable = false, checked = false, onToggle 
             const ok = await deleteDocument(_id);
             if (ok) {
                 clearCurrent();
-                try { getDocuments(); } catch(e) {}
+                try { getDocuments(); } catch (e) { }
                 setAlert('Document removed', 'success');
                 setConfirmOpen(false);
             } else {
@@ -67,12 +67,19 @@ const DocumentItem = ({ document, selectable = false, checked = false, onToggle 
                                 )
                             )}
                         </div>
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${status === 'Closed' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                        <span className={`px-2.5 py-0.5 text-xs font-medium rounded-full 
+                            ${status === 'Approved' ? 'bg-green-100 text-green-800' : ''}
+                            ${status === 'Pending Approval' ? 'bg-amber-100 text-amber-800' : ''}
+                            ${status === 'Rejected' ? 'bg-red-100 text-red-800' : ''}
+                            ${status === 'Closed' ? 'bg-slate-100 text-slate-800' : ''}
+                            ${status === 'Draft' ? 'bg-gray-100 text-gray-800' : ''}
+                            ${!status || status === 'Open' ? 'bg-blue-100 text-blue-800' : ''}
+                        `}>
                             {status || 'Open'}
                         </span>
                     </div>
                     <div className="text-xs text-gray-500 mb-3 flex items-center gap-3 flex-wrap">
-                            <div>
+                        <div>
                             <span className="mr-1">Owner:</span>
                             <span title={ownerDisplay} className="font-medium text-gray-700">{ownerDisplay || 'Unknown'}</span>
                         </div>
@@ -80,14 +87,14 @@ const DocumentItem = ({ document, selectable = false, checked = false, onToggle 
                             <span className="text-xs rounded-full bg-gray-100 px-2 py-1 text-gray-600">{owner.role}</span>
                         )}
                         {document.assignedTo && (
-                                <div className="ml-4">
+                            <div className="ml-4">
                                 <span className="mr-1 text-xs text-gray-500">Assigned to:</span>
                                 <span title={document.assignedToName || (document.assignedTo?.username || document.assignedTo)} className="font-medium text-gray-700 text-xs">{document.assignedToName || (document.assignedTo?.username || document.assignedTo)}</span>
                             </div>
                         )}
                     </div>
                     <p className='text-gray-600 mb-4 leading-relaxed line-clamp-3 text-sm'>{content}</p>
-                    
+
                     {tags && tags.length > 0 && (
                         <div className="mb-4 flex flex-wrap gap-2">
                             {tags.map(tag => (
@@ -117,21 +124,21 @@ const DocumentItem = ({ document, selectable = false, checked = false, onToggle 
                     </div>
                     {((user && user.role === 'admin') || (user && String(user._id) === ownerId)) && (
                         <div className="w-full sm:w-auto">
-                        <button aria-label="Delete document" onClick={onDelete} className="w-full sm:w-auto">
-                            <Button variant="danger" size="sm" className="w-full sm:w-auto">Delete</Button>
-                        </button>
+                            <button aria-label="Delete document" onClick={onDelete} className="w-full sm:w-auto">
+                                <Button variant="danger" size="sm" className="w-full sm:w-auto">Delete</Button>
+                            </button>
                         </div>
                     )}
                     {((user && user.role === 'admin') || (user && String(user._id) === ownerId) || (user && String(user._id) === String(document.assignedTo))) && (
                         <div className="w-full sm:w-auto">
-                        <button aria-label="Forward document" onClick={() => setForwardOpen(true)} className="w-full sm:w-auto">
-                            <Button variant="secondary" size="sm" className="w-full sm:w-auto">Forward</Button>
-                        </button>
+                            <button aria-label="Forward document" onClick={() => setForwardOpen(true)} className="w-full sm:w-auto">
+                                <Button variant="secondary" size="sm" className="w-full sm:w-auto">Forward</Button>
+                            </button>
                         </div>
                     )}
                 </div>
             </div>
-            
+
             {/* Delete Confirmation Modal */}
             <Modal isOpen={confirmOpen} onClose={() => setConfirmOpen(false)} title="Confirm delete"
                 actions={<>

@@ -143,41 +143,41 @@ const AdminUsers = () => {
                     {loading ? (
                         <div className='flex justify-center py-8'><Spinner /></div>
                     ) : (
-                        <div className='overflow-x-auto'>
-                        <table className='w-full table-auto'>
-                            <thead>
-                                <tr>
-                                    <th className='text-left p-2'>Username</th>
-                                    <th className='text-left p-2'>Role</th>
-                                    <th className='text-left p-2'>Full Name</th>
-                                    <th className='text-right p-2'>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className='odd:bg-white even:bg-slate-50'>
-                                {users.length === 0 ? (
-                                    <tr>
-                                        <td className='p-4 text-center' colSpan={4}>No users found.</td>
+                        <div className='overflow-x-auto rounded-lg border border-gray-200'>
+                            <table className='w-full text-left border-collapse'>
+                                <thead>
+                                    <tr className='bg-gray-100 text-gray-600 uppercase text-xs font-semibold tracking-wider'>
+                                        <th className='p-4 border-b'>Username</th>
+                                        <th className='p-4 border-b'>Role</th>
+                                        <th className='p-4 border-b'>Full Name</th>
+                                        <th className='p-4 border-b text-right'>Actions</th>
                                     </tr>
-                                ) : users.map(u => (
-                                    <tr key={u._id} className='border-t hover:bg-gray-50 transition'>
-                                        <td className='p-3 text-sm font-medium'>{u.username}</td>
-                                        <td className='p-3 text-sm text-gray-600'>{u.role}</td>
-                                        <td className='p-3 text-sm text-gray-700'>{u.fullName}</td>
-                                        <td className='p-3 text-right'>
-                                            <Button variant='secondary' className='mr-2' onClick={() => setEditUser(u)}>Edit</Button>
+                                </thead>
+                                <tbody className='odd:bg-white even:bg-slate-50'>
+                                    {users.length === 0 ? (
+                                        <tr>
+                                            <td className='p-4 text-center' colSpan={4}>No users found.</td>
+                                        </tr>
+                                    ) : users.map(u => (
+                                        <tr key={u._id} className='border-t hover:bg-gray-50 transition'>
+                                            <td className='p-3 text-sm font-medium'>{u.username}</td>
+                                            <td className='p-3 text-sm text-gray-600'>{u.role}</td>
+                                            <td className='p-3 text-sm text-gray-700'>{u.fullName}</td>
+                                            <td className='p-3 text-right'>
+                                                <Button variant='secondary' className='mr-2' onClick={() => setEditUser(u)}>Edit</Button>
                                                 <Button variant='secondary' className='mr-2' onClick={() => { setHistoryUserId(u._id); }}>History</Button>
-                                            <Button variant='danger' onClick={() => setDeleteUserId(u._id)} disabled={!(user && ['admin', 'technical-admin'].includes(user.role)) || (user._id === u._id)}>Delete</Button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                                <Button variant='danger' onClick={() => setDeleteUserId(u._id)} disabled={!(user && ['admin', 'technical-admin'].includes(user.role)) || (user._id === u._id)}>Delete</Button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
                     )}
                 </div>
             </div>
 
-                {editUser && (
+            {editUser && (
                 <Modal isOpen={!!editUser} onClose={() => setEditUser(null)} title={`Edit user ${editUser.username}`} actions={<>
                     <Button variant='secondary' onClick={() => setEditUser(null)}>Cancel</Button>
                     <Button onClick={() => {
@@ -185,12 +185,12 @@ const AdminUsers = () => {
                         if (canChangeRole) payload.role = editUser.role;
                         onSaveEdit(editUser._id, payload);
                     }}>Save</Button>
-                </>}> 
+                </>}>
                     <div className='space-y-3'>
                         <label>Username</label>
-                        <input value={editUser.username} disabled className='w-full p-2 border rounded'/>
+                        <input value={editUser.username} disabled className='w-full p-2 border rounded' />
                         <label>Full name</label>
-                        <input value={editUser.fullName || ''} onChange={e => setEditUser({ ...editUser, fullName: e.target.value })} className='w-full p-2 border rounded'/>
+                        <input value={editUser.fullName || ''} onChange={e => setEditUser({ ...editUser, fullName: e.target.value })} className='w-full p-2 border rounded' />
                         <label>Role</label>
                         <select value={editUser.role} onChange={e => setEditUser({ ...editUser, role: e.target.value })} className='w-full p-2 border rounded' disabled={!canChangeRole}>
                             {(roleAllowances[user?.role] || []).map(r => <option key={r} value={r}>{r}</option>)}
@@ -245,7 +245,7 @@ const AdminUsers = () => {
                             setAlert('Backfill failed', 'danger');
                         }
                     }} disabled={backfillLoading}>{backfillLoading ? 'Running...' : 'Run Backfill'}</Button>
-                </>}> 
+                </>}>
                     <p className='text-sm text-gray-700'>This will backfill missing document metadata (docRef, docRefShort, performedByName and eventId) for existing documents. This action is irreversible. Proceed?</p>
                 </Modal>
             )}

@@ -52,15 +52,17 @@ The frontend includes an admin-only form in the Dashboard that shows only the ro
 
 - The project includes a simple IP-based rate limit on `/api/auth/login` (default: 10 attempts / 10 minutes per IP) to mitigate brute-force attacks. Review and tune values for production.
 - Accounts get locked after repeated failed login attempts and `lockUntil` indicates when the account will be unlocked. This prevents repeated attempts even from multiple IPs if attacker manages to use valid usernames; choose sensible thresholds for your application.
-- For production, store `JWT_SECRET` in a secure secrets manager or environment variable and use HttpOnly secure cookies for tokens instead of localStorage where possible.
-
 A full-stack web application that lets users upload, manage, and track documents with version history and role-based access controls.
 
 ## Key Features
-
--   **User Authentication:** Secure login/registration with role-based access (users and admins).
--   **Document Management:** Full CRUD (Create, Read, Update, Delete) operations for documents.
--   **Granular Access Control:** Per-document access rights for viewers and editors, in addition to document owners and admins.
+- **Document Management:** Create, read, update, delete (CRUD) documents with version control.
+- **Advanced Search:** Full-text search and filtering by status, tags, and date ranges.
+- **Approval Workflows:** Structured lifecycle (Draft -> Pending Approval -> Approved/Rejected).
+- **Activity Logs:** Comprehensive system-wide audit logging for Admins.
+- **Reporting:** Custom CSV report generation and export.
+- **Comments & Collaboration:** Discuss documents directly on the page.
+- **Bulk Actions:** Delete, Close, Assign, or Tag multiple documents at once.
+- **Role-Based Access Control:** Granular permissions for Admins, Managers, and Viewers.
 -   **Version Control:** Automatically track and view document revisions and history.
 -   **Search & Filter:** Find documents by title, content, tags, or metadata.
 -   **Responsive UI:** Built with Tailwind CSS for a modern, responsive user interface.

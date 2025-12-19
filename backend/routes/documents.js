@@ -5,9 +5,10 @@ const { check } = require('express-validator');
 const {
     getDocuments,
     createDocument,
-    getDocumentById,
     updateDocument,
     deleteDocument,
+    getStats,
+    addComment
 } = require('../controllers/documents');
 const { forwardDocument, exportDocuments, bulkAction } = require('../controllers/documents');
 
@@ -17,6 +18,9 @@ const documentValidation = [
     check('content', 'Content is required').not().isEmpty(),
 ];
 
+// Stats route (must be before /:id)
+router.get('/stats', auth, getStats);
+
 router.route('/')
     .get(auth, getDocuments)
     .post(auth, documentValidation, createDocument);
@@ -25,6 +29,11 @@ router.route('/:id')
     .get(auth, getDocumentById)
     .put(auth, documentValidation, updateDocument)
     .delete(auth, deleteDocument);
+
+router.post('/:id/comments', auth, addComment);
+router.put('/:id/submit', auth, submitDocument);
+router.put('/:id/approve', auth, approveDocument);
+router.put('/:id/reject', auth, rejectDocument);
 
 router.post('/:id/forward', auth, forwardDocument);
 // Export CSV

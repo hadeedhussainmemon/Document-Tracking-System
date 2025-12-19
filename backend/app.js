@@ -23,6 +23,24 @@ const auditLogRoutes = require('./routes/auditlogs');
 const adminRoutes = require('./routes/admin');
 
 app.use(express.json());
+
+// Security Middleware
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+
+// Set security headers
+app.use(helmet());
+
+// Global Rate Limiting
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // limit each IP to 100 requests per windowMs
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: 'Too many requests from this IP, please try again later.'
+});
+app.use(limiter);
+
 // Enable CORS for development client; use an environment variable to lock down in production
 // Enable CORS for development client; use an environment variable to lock down in production
 // Explicitly allow x-auth-token header used by the client and common HTTP methods.

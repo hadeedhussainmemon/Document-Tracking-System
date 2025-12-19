@@ -13,6 +13,8 @@ import PrivateRoute from './components/PrivateRoute';
 import AdminRoute from './components/AdminRoute';
 import Alerts from './components/Alerts';
 import AdminUsers from './pages/AdminUsers';
+import ActivityLogs from './components/admin/ActivityLogs';
+import Reports from './pages/Reports';
 
 function App() {
   return (
@@ -40,11 +42,21 @@ function App() {
                     <AllDocuments />
                   </PrivateRoute>
                 } />
-                    <Route path="/admin/users" element={
-                      <AdminRoute roles={['admin','technical-admin','manager','ceo','hr']}>
-                        <AdminUsers />
-                      </AdminRoute>
-                    } />
+                <Route path="/admin/users" element={
+                  <AdminRoute roles={['admin', 'technical-admin', 'manager', 'ceo', 'hr']}>
+                    <AdminUsers />
+                  </AdminRoute>
+                } />
+                <Route path="/admin/logs" element={
+                  <AdminRoute>
+                    <ActivityLogs />
+                  </AdminRoute>
+                } />
+                <Route path="/reports" element={
+                  <AdminRoute>
+                    <Reports />
+                  </AdminRoute>
+                } />
                 <Route path="/document/:id" element={
                   <PrivateRoute>
                     <DocumentPage />

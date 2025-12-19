@@ -78,8 +78,9 @@ export default (state, action) => {
                     let matches = true;
 
                     // Filter by text (title/content)
-                    if (text) {
-                        const textRegex = new RegExp(text, 'gi');
+                    const searchText = text || action.payload.search;
+                    if (searchText) {
+                        const textRegex = new RegExp(searchText, 'gi');
                         matches = matches && (document.title.match(textRegex) || document.content.match(textRegex));
                     }
 
@@ -121,6 +122,16 @@ export default (state, action) => {
                         matches = matches && String(assignedId) === String(assignedTo);
                     }
 
+                    // Date Range Filter (CreatedAt)
+                    if (action.payload.startDate) {
+                        matches = matches && new Date(document.createdAt) >= new Date(action.payload.startDate);
+                    }
+                    if (action.payload.endDate) {
+                        const end = new Date(action.payload.endDate);
+                        end.setHours(23, 59, 59, 999);
+                        matches = matches && new Date(document.createdAt) <= end;
+                    }
+
                     return matches;
                 })
             };
@@ -143,4 +154,3 @@ export default (state, action) => {
             return state;
     }
 };
-        

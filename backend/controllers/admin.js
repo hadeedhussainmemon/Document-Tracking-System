@@ -4,11 +4,11 @@ const Counter = require('../models/Counter');
 const crypto = require('crypto');
 
 const generateRandomString = (len = 10) => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  const bytes = crypto.randomBytes(len);
-  let res = '';
-  for (let i = 0; i < len; i++) res += chars[bytes[i] % chars.length];
-  return res;
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const bytes = crypto.randomBytes(len);
+    let res = '';
+    for (let i = 0; i < len; i++) res += chars[bytes[i] % chars.length];
+    return res;
 };
 const generateId = (prefix, len = 10) => `${prefix}-${generateRandomString(len)}`;
 
@@ -75,4 +75,62 @@ const backfillPerformedByName = async (req, res) => {
 
 module.exports = {
     backfillPerformedByName,
+    getAuditLogs,
+    getAuditLogsExport
+};
+
+const AuditLog = require('../models/AuditLog');
+
+const getAuditLogs = async (req, res) => {
+    try {
+        // Pagination
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
+        const skip = (page - 1) * limit;
+
+        const total = await AuditLog.countDocuments();
+
+        const logs = await AuditLog.find()
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .populate('performedBy', ['username', 'email']);
+
+        res.json({ logs, total, page, totalPages: Math.ceil(total / limit) });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+};
+
+const getAuditLogsExport = async (req, res) => {
+    try {
+        const logs = await AuditLog.find()
+            .sort({ createdAt: -1 })
+            .populate('performedBy', ['username']);
+
+        const csvRows = [];
+        const headers = ['Action', 'Target Model', 'Target ID', 'Performed By', 'Details', 'Date'];
+        csvRows.push(headers.join(','));
+
+        logs.forEach(log => {
+            const row = [
+                log.action,
+                log.targetModel,
+                log.targetId,
+                log.performedBy ? (log.performedBy.username || 'Unknown') : 'System',
+                `"${JSON.stringify(log.details || {}).replace(/"/g, '""')}"`,
+                log.createdAt.toISOString()
+            ];
+            csvRows.push(row.join(','));
+        });
+
+        const csv = csvRows.join('\n');
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename="system_logs.csv"');
+        return res.send(csv);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
 };

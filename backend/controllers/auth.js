@@ -139,7 +139,8 @@ const requestPasswordReset = async (req, res) => {
         user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
         await user.save();
         // In production you would email the token
-        res.json({ msg: 'Password reset token generated', token: token });
+        console.log(`[DEV ONLY] Password Reset Token for ${username}: ${token}`);
+        res.json({ msg: 'Password reset token generated (check server logs for token)' });
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server error');

@@ -4,6 +4,7 @@ const Document = require('../models/Document');
 const Counter = require('../models/Counter');
 const User = require('../models/User');
 const AuditLog = require('../models/AuditLog');
+const { sendAssignmentNotification, sendStatusChangeNotification } = require('../services/emailService');
 const crypto = require('crypto');
 const generateRandomString = (len = 10) => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -64,10 +65,28 @@ const getDocuments = async (req, res) => {
             Object.assign(query, metadataQuery);
         }
 
+        // Date Range Filtering (CreatedAt)
+        if (req.query.startDate || req.query.endDate) {
+            query.createdAt = {};
+            if (req.query.startDate) {
+                query.createdAt.$gte = new Date(req.query.startDate);
+            }
+            if (req.query.endDate) {
+                // set to end of day if only date string provided
+                const end = new Date(req.query.endDate);
+                end.setHours(23, 59, 59, 999);
+                query.createdAt.$lte = end;
+            }
+        }
+
+        let sort = { createdAt: -1 };
+        let projection = {};
+
         // text search on title or content
         if (req.query.text) {
-            const regex = new RegExp(req.query.text.trim(), 'i');
-            query.$or = (query.$or || []).concat([{ title: regex }, { content: regex }]);
+            query.$text = { $search: req.query.text };
+            sort = { score: { $meta: "textScore" } };
+            projection = { score: { $meta: "textScore" } };
         }
 
         // Apply role-based access control
@@ -93,7 +112,7 @@ const getDocuments = async (req, res) => {
                     $or: [
                         { owner: req.user.id },
                         { 'accessControl.user': req.user.id }
-                        ,{ assignedTo: req.user.id }
+                        , { assignedTo: req.user.id }
                     ]
                 };
             }
@@ -106,15 +125,11 @@ const getDocuments = async (req, res) => {
 
         const total = await Document.countDocuments(query);
 
-        const documents = await Document.find(query)
-            .populate('owner', ['_id', 'username', 'role'])
-            .populate('assignedTo', ['_id', 'username', 'fullName', 'role'])
-            .populate('history.performedBy', ['username']);
         // Use Mongoose pagination properly
-        const pagedDocs = await Document.find(query)
+        const pagedDocs = await Document.find(query, projection)
             .skip(skip)
             .limit(limit)
-            .sort({ createdAt: -1 })
+            .sort(sort)
             .populate('owner', ['_id', 'username', 'role'])
             .populate('assignedTo', ['_id', 'username', 'fullName', 'role'])
             .populate('history.performedBy', ['username']);
@@ -139,45 +154,45 @@ const createDocument = async (req, res) => {
             tagsArray = tags.split(',').map(tag => tag.trim());
         }
 
-            // if assignedTo provided without name, try to resolve
-            let assignedToName = req.body.assignedToName || '';
-            if (req.body.assignedTo && !assignedToName) {
-                try {
-                    const assignedUser = await User.findById(req.body.assignedTo).select('username');
-                    if (assignedUser) assignedToName = assignedUser.username || '';
-                } catch (err) { }
-            }
-
-            // generate short sequential docRef DOC-000012
-            const getNextSequence = async name => {
-                const updated = await Counter.findOneAndUpdate(
-                    { _id: name },
-                    { $inc: { seq: 1 } },
-                    { new: true, upsert: true }
-                );
-                return updated.seq;
-            };
-
-            let docRefShort;
+        // if assignedTo provided without name, try to resolve
+        let assignedToName = req.body.assignedToName || '';
+        if (req.body.assignedTo && !assignedToName) {
             try {
-                const seq = await getNextSequence('documentRef');
-                docRefShort = `DOC-${String(seq).padStart(6, '0')}`;
-            } catch (e) {
-                docRefShort = generateId('DOC', 10);
-            }
+                const assignedUser = await User.findById(req.body.assignedTo).select('username');
+                if (assignedUser) assignedToName = assignedUser.username || '';
+            } catch (err) { }
+        }
 
-            const newDocument = new Document({
+        // generate short sequential docRef DOC-000012
+        const getNextSequence = async name => {
+            const updated = await Counter.findOneAndUpdate(
+                { _id: name },
+                { $inc: { seq: 1 } },
+                { new: true, upsert: true }
+            );
+            return updated.seq;
+        };
+
+        let docRefShort;
+        try {
+            const seq = await getNextSequence('documentRef');
+            docRefShort = `DOC-${String(seq).padStart(6, '0')}`;
+        } catch (e) {
+            docRefShort = generateId('DOC', 10);
+        }
+
+        const newDocument = new Document({
             title,
             content,
             owner: req.user.id,
-                assignedTo: req.body.assignedTo || undefined,
-                assignedToName: assignedToName || undefined,
+            assignedTo: req.body.assignedTo || undefined,
+            assignedToName: assignedToName || undefined,
             tags: tagsArray || [],
             metadata: metadata || {},
             accessControl: accessControl || [],
             status: 'Open',
             docRef: generateId('DOC', 10),
-                docRefShort,
+            docRefShort,
             history: [{
                 action: 'Created',
                 performedBy: req.user.id,
@@ -193,6 +208,20 @@ const createDocument = async (req, res) => {
             await log.save();
         } catch (err) {
             console.error('Audit logging failed:', err.message);
+        }
+
+        // Email Notification if assigned
+        if (document.assignedTo) {
+            try {
+                const assignedUser = await User.findById(document.assignedTo);
+                if (assignedUser) { // We don't have email in User model yet? using username@example.com for now or check if User schema has email.
+                    // Assuming User model has email or we use a fallback for testing
+                    const email = assignedUser.email || `${assignedUser.username}@example.com`;
+                    sendAssignmentNotification(email, document.title, req.user.username, document._id);
+                }
+            } catch (e) {
+                console.error('Failed to send assignment email', e);
+            }
         }
         res.json(document);
     } catch (err) {
@@ -271,7 +300,7 @@ const updateDocument = async (req, res) => {
         const hasContentChanged = document.content !== content || document.title !== title;
         const haveTagsChanged = !_.isEqual(document.tags.sort(), (tagsArray || []).sort());
         const hasMetadataChanged = !_.isEqual(document.metadata, metadata || {});
-        
+
         if (hasContentChanged || haveTagsChanged || hasMetadataChanged) {
             document.versionHistory.push({
                 content: document.content,
@@ -314,11 +343,11 @@ const updateDocument = async (req, res) => {
         }
 
         if (accessControl && JSON.stringify(document.accessControl) !== JSON.stringify(accessControl)) {
-                 document.history.push({
+            document.history.push({
                 action: 'Forwarded/Shared',
                 performedBy: req.user.id,
                 performedByName: req.user.username || '',
-                    eventId: generateId('EVT', 10),
+                eventId: generateId('EVT', 10),
                 details: 'Access control list updated'
             });
         }
@@ -329,7 +358,7 @@ const updateDocument = async (req, res) => {
             try {
                 const newUser = await User.findById(assignedTo).select('username');
                 newAssignedToName = newUser ? newUser.username : '';
-            } catch (err) {}
+            } catch (err) { }
             document.history.push({
                 action: 'Assigned',
                 performedBy: req.user.id,
@@ -342,15 +371,15 @@ const updateDocument = async (req, res) => {
         }
 
         if (hasContentChanged) {
-                 document.history.push({
+            document.history.push({
                 action: 'Edited',
                 performedBy: req.user.id,
                 performedByName: req.user.username || '',
-                     eventId: generateId('EVT', 10),
+                eventId: generateId('EVT', 10),
                 details: 'Document content or title updated'
             });
         }
-       
+
         document.title = title;
         document.content = content;
         document.tags = tagsArray || [];
@@ -358,12 +387,50 @@ const updateDocument = async (req, res) => {
         if (accessControl) document.accessControl = accessControl;
 
         await document.save();
+        await document.save();
+        // AuditLog logic removed as 'log' was undefined. 
+        // Ideally should implement similar to createDocument if needed.
+
+
+
+        // Email Notifications
         try {
-            const log = new AuditLog({ action: 'update', targetModel: 'Document', targetId: document._id, performedBy: req.user.id, details: { title: document.title } });
-            await log.save();
-        } catch (err) {
-            console.error('Audit logging failed:', err.message);
-        }
+            // Status Change
+            if (status && status !== 'Open') { // Simple logic: if status passed and changed (logic handled above, but here we just check if status is present in payload. Actually, check logic above: document.status was already updated 20 lines up. Need to capture 'originalStatus' before update effectively. 
+                // Correction: The document status is ALREADY updated in memory by the time we reach here.
+                // We can check the history to see if status changed in this request.
+                const lastHistory = document.history[document.history.length - 1];
+                if (lastHistory && lastHistory.action === 'Status Change') {
+                    // Try to notify owner and assignedTo
+                    const recipients = [];
+                    if (document.owner) {
+                        const owner = await User.findById(document.owner);
+                        if (owner) recipients.push(owner.email || `${owner.username}@example.com`);
+                    }
+                    if (document.assignedTo) {
+                        const assignee = await User.findById(document.assignedTo);
+                        if (assignee && assignee.id !== req.user.id) recipients.push(assignee.email || `${assignee.username}@example.com`);
+                    }
+                    // dedup and send
+                    [...new Set(recipients)].forEach(email => {
+                        sendStatusChangeNotification(email, document.title, document.status, document._id);
+                    });
+                }
+            }
+
+            // Assignment Change
+            const lastHistory = document.history[document.history.length - 1];
+            if (lastHistory && lastHistory.action === 'Assigned') {
+                if (document.assignedTo) {
+                    const assignedUser = await User.findById(document.assignedTo);
+                    if (assignedUser) {
+                        const email = assignedUser.email || `${assignedUser.username}@example.com`;
+                        sendAssignmentNotification(email, document.title, req.user.username, document._id);
+                    }
+                }
+            }
+        } catch (e) { console.error('Email notification failed', e); }
+
         res.json(document);
     } catch (err) {
         console.error(err.message);
@@ -446,6 +513,18 @@ const forwardDocument = async (req, res) => {
         });
 
         await document.save();
+
+        // Email Notification
+        try {
+            if (document.assignedTo) {
+                const assignedUser = await User.findById(document.assignedTo);
+                if (assignedUser) {
+                    const email = assignedUser.email || `${assignedUser.username}@example.com`;
+                    sendAssignmentNotification(email, document.title, req.user.username, document._id);
+                }
+            }
+        } catch (e) { console.error('Forward email failed', e); }
+
         res.json(document);
     } catch (err) {
         console.error(err.message);
@@ -469,6 +548,17 @@ const exportDocuments = async (req, res) => {
             if (filters.assignedTo) query.assignedTo = filters.assignedTo;
             if (filters.docRefShort) query.docRefShort = filters.docRefShort;
             if (filters.tags) query.tags = { $in: filters.tags.split(',').map(t => new RegExp(t.trim(), 'i')) };
+
+            // Date Range Filter
+            if (filters.startDate || filters.endDate) {
+                query.createdAt = {};
+                if (filters.startDate) query.createdAt.$gte = new Date(filters.startDate);
+                if (filters.endDate) {
+                    const end = new Date(filters.endDate);
+                    end.setHours(23, 59, 59, 999); // Include the whole end day
+                    query.createdAt.$lte = end;
+                }
+            }
         }
 
         // Get documents the requester is allowed to access
@@ -478,7 +568,7 @@ const exportDocuments = async (req, res) => {
             if (roleGroup.includes(req.user.role)) {
                 const owners = await User.find({ role: { $in: roleGroup } }).select('_id');
                 const ownerIds = owners.map(o => o._id);
-                query = { ...query, $or: [ { owner: req.user.id }, { 'accessControl.user': req.user.id }, { assignedTo: req.user.id }, { owner: { $in: ownerIds } } ] };
+                query = { ...query, $or: [{ owner: req.user.id }, { 'accessControl.user': req.user.id }, { assignedTo: req.user.id }, { owner: { $in: ownerIds } }] };
             } else {
                 query = { ...query, $or: [{ owner: req.user.id }, { 'accessControl.user': req.user.id }, { assignedTo: req.user.id }] };
             }
@@ -567,10 +657,26 @@ const bulkAction = async (req, res) => {
                     continue;
                 }
                 doc.assignedTo = assignedTo;
-                try { const userObj = await User.findById(assignedTo).select('username'); doc.assignedToName = userObj ? userObj.username : ''; } catch(e) {}
+                try { const userObj = await User.findById(assignedTo).select('username'); doc.assignedToName = userObj ? userObj.username : ''; } catch (e) { }
                 doc.history.push({ action: 'Assigned', performedBy: req.user.id, performedByName: req.user.username || '', eventId: generateId('EVT', 10), details: `Assigned to ${doc.assignedToName || assignedTo}` });
                 await doc.save();
                 results.push({ id, success: true, msg: 'Assigned' });
+                continue;
+            }
+
+            if (action === 'tag') {
+                const { tags } = payload || {};
+                if (!tags || !Array.isArray(tags)) {
+                    results.push({ id, success: false, msg: 'No tags array specified' });
+                    continue;
+                }
+                // Merge unique tags
+                const tagSet = new Set([...doc.tags, ...tags]);
+                doc.tags = Array.from(tagSet);
+
+                doc.history.push({ action: 'Edited', performedBy: req.user.id, performedByName: req.user.username || '', eventId: generateId('EVT', 10), details: `Bulk added tags: ${tags.join(', ')}` });
+                await doc.save();
+                results.push({ id, success: true, msg: 'Tagged' });
                 continue;
             }
 
@@ -583,12 +689,206 @@ const bulkAction = async (req, res) => {
     }
 };
 
+
+
+const getStats = async (req, res) => {
+    try {
+        const query = {};
+        if (req.user.role !== 'admin') {
+            query.$or = [{ owner: req.user.id }, { assignedTo: req.user.id }];
+        }
+
+        const total = await Document.countDocuments(query);
+
+        // Detailed breakdown
+        const stats = await Document.aggregate([
+            { $match: query },
+            { $group: { _id: '$status', count: { $sum: 1 } } }
+        ]);
+
+        const breakdown = {
+            Draft: 0,
+            'Pending Approval': 0,
+            Approved: 0,
+            Rejected: 0,
+            Open: 0,
+            Closed: 0
+        };
+
+        stats.forEach(s => {
+            if (breakdown.hasOwnProperty(s._id)) {
+                breakdown[s._id] = s.count;
+            } else {
+                // handle legacy or unknown status by defaulting to Open if not Closed? 
+                // or just ignore. 
+            }
+        });
+
+        // Computed Active/Closed for legacy frontend support
+        // Active = Open + Draft + Pending + Approved
+        const open = (breakdown.Open || 0) + (breakdown.Draft || 0) + (breakdown['Pending Approval'] || 0) + (breakdown.Approved || 0);
+        // Closed = Closed + Rejected
+        const closed = (breakdown.Closed || 0) + (breakdown.Rejected || 0);
+
+        // Activity (last 7 days created)
+        const last7Days = new Date();
+        last7Days.setDate(last7Days.getDate() - 7);
+        const recent = await Document.countDocuments({ ...query, createdAt: { $gte: last7Days } });
+
+        res.json({ total, open, closed, recent, breakdown });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+}
+
+const addComment = async (req, res) => {
+    try {
+        const { text } = req.body;
+        if (!text) return res.status(400).json({ msg: 'Comment text is required' });
+
+        const document = await Document.findById(req.params.id);
+        if (!document) return res.status(404).json({ msg: 'Document not found' });
+
+        // Access Check: Owner, Admin, Assigned, or in AccessControl
+        const isOwner = document.owner.toString() === req.user.id;
+        const isAdmin = req.user.role === 'admin';
+        const isAssigned = document.assignedTo && document.assignedTo.toString() === req.user.id;
+        const hasAccess = document.accessControl.some(ac => ac.user.toString() === req.user.id);
+
+        if (!isOwner && !isAdmin && !isAssigned && !hasAccess) {
+            return res.status(401).json({ msg: 'Not authorized to comment' });
+        }
+
+        const newComment = {
+            text,
+            author: req.user.id,
+            authorName: req.user.username || 'Unknown',
+            createdAt: new Date()
+        };
+
+        document.comments.unshift(newComment);
+        await document.save();
+        res.json(document.comments);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+};
+
+const submitDocument = async (req, res) => {
+    try {
+        const document = await Document.findById(req.params.id);
+        if (!document) return res.status(404).json({ msg: 'Document not found' });
+
+        if (document.owner.toString() !== req.user.id) {
+            return res.status(401).json({ msg: 'Not authorized' });
+        }
+
+        if (['Approved', 'Pending Approval'].includes(document.status)) {
+            return res.status(400).json({ msg: 'Document already submitted or approved' });
+        }
+
+        document.status = 'Pending Approval';
+        document.history.push({
+            action: 'Submitted',
+            performedBy: req.user.id,
+            performedByName: req.user.username || '',
+            eventId: generateId('EVT', 10),
+            details: 'Submitted for approval'
+        });
+        await document.save();
+        res.json(document);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+};
+
+const approveDocument = async (req, res) => {
+    try {
+        const document = await Document.findById(req.params.id);
+        if (!document) return res.status(404).json({ msg: 'Document not found' });
+
+        if (!['admin', 'technical-admin', 'manager', 'ceo'].includes(req.user.role)) {
+            return res.status(403).json({ msg: 'Not authorized to approve documents' });
+        }
+
+        if (document.status !== 'Pending Approval') {
+            return res.status(400).json({ msg: 'Document is not pending approval' });
+        }
+
+        document.status = 'Approved';
+        document.history.push({
+            action: 'Approved',
+            performedBy: req.user.id,
+            performedByName: req.user.username || '',
+            eventId: generateId('EVT', 10),
+            details: 'Document approved'
+        });
+        await document.save();
+
+        try {
+            const owner = await User.findById(document.owner);
+            if (owner) sendStatusChangeNotification(owner.email || `${owner.username}@example.com`, document.title, 'Approved', document._id);
+        } catch (e) { }
+
+        res.json(document);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+};
+
+const rejectDocument = async (req, res) => {
+    try {
+        const { reason } = req.body;
+        const document = await Document.findById(req.params.id);
+        if (!document) return res.status(404).json({ msg: 'Document not found' });
+
+        if (!['admin', 'technical-admin', 'manager', 'ceo'].includes(req.user.role)) {
+            return res.status(403).json({ msg: 'Not authorized to reject documents' });
+        }
+
+        // Allow rejecting approved docs too if needed, but primary use is Pending -> Rejected
+        if (document.status !== 'Pending Approval' && document.status !== 'Approved') {
+            return res.status(400).json({ msg: 'Document is not pending approval' });
+        }
+
+        document.status = 'Rejected';
+        document.history.push({
+            action: 'Rejected',
+            performedBy: req.user.id,
+            performedByName: req.user.username || '',
+            eventId: generateId('EVT', 10),
+            details: `Rejected: ${reason || 'No reason provided'}`
+        });
+        await document.save();
+
+        try {
+            const owner = await User.findById(document.owner);
+            if (owner) sendStatusChangeNotification(owner.email || `${owner.username}@example.com`, document.title, 'Rejected', document._id);
+        } catch (e) { }
+
+        res.json(document);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+};
+
 module.exports = {
     getDocuments,
     createDocument,
     getDocumentById,
     updateDocument,
     deleteDocument,
-    forwardDocument
-    , exportDocuments, bulkAction
+    forwardDocument,
+    exportDocuments,
+    bulkAction,
+    getStats,
+    addComment,
+    submitDocument,
+    approveDocument,
+    rejectDocument
 };

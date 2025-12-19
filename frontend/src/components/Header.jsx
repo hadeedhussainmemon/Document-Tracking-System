@@ -25,28 +25,43 @@ const Header = () => {
         <Fragment>
             {isAuthenticated && (
                 <li>
-                    <Link 
-                        to="/dashboard" 
+                    <Link
+                        to="/dashboard"
                         className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/dashboard') ? 'bg-white/20 text-white' : 'text-white/80 hover:text-white hover:bg-white/10'}`}
                     >
                         Dashboard
                     </Link>
                 </li>
             )}
-            {(user && (user.role === 'admin' || user.role === 'technical-admin')) && (
-                <li>
-                    <Link 
-                        to="/admin/users" 
-                        className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/admin/users') ? 'bg-white/20 text-white' : 'text-white/80 hover:text-white hover:bg-white/10'}`}
+
+            {/* Admin Dropdown Desktop */}
+            {isAuthenticated && (user && (user.role === 'admin' || user.role === 'technical-admin')) && (
+                <li className="relative group">
+                    <button
+                        className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${location.pathname.startsWith('/admin') || location.pathname === '/reports' ? 'bg-white/20 text-white' : 'text-white/80 hover:text-white hover:bg-white/10'}`}
                     >
-                        Users
-                    </Link>
+                        Admin
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    {/* Dropdown Menu */}
+                    <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-xl shadow-xl overflow-hidden hidden group-hover:block animate-fade-in origin-top-left transform transition-all">
+                        <Link to="/admin/users" className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100">
+                            User Management
+                        </Link>
+                        <Link to="/admin/logs" className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100">
+                            Activity Logs
+                        </Link>
+                        <Link to="/reports" className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50">
+                            Reports
+                        </Link>
+                    </div>
                 </li>
             )}
+
             {isAuthenticated && (
                 <li>
-                    <Link 
-                        to="/documents" 
+                    <Link
+                        to="/documents"
                         className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/documents') ? 'bg-white/20 text-white' : 'text-white/80 hover:text-white hover:bg-white/10'}`}
                     >
                         All Documents
@@ -60,8 +75,8 @@ const Header = () => {
                     </div>
                     <span className="hidden lg:inline text-sm font-medium">{user && user.username}</span>
                 </div>
-                <button 
-                    onClick={onLogout} 
+                <button
+                    onClick={onLogout}
                     className="text-white/80 hover:text-white transition-colors p-1 rounded hover:bg-white/10"
                     title="Logout"
                 >
@@ -97,7 +112,7 @@ const Header = () => {
                     <Link to='/' className="flex items-center gap-2 group">
                         <div className="bg-white/10 p-2 rounded-lg group-hover:bg-white/20 transition-colors">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white">
-                                <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                         </div>
                         <span className="text-xl font-bold tracking-tight">DocTracker</span>
@@ -113,8 +128,8 @@ const Header = () => {
 
                 {/* Mobile menu button */}
                 <div className="md:hidden">
-                    <button 
-                        onClick={() => setOpen(!open)} 
+                    <button
+                        onClick={() => setOpen(!open)}
                         className="p-2 rounded-md text-white hover:bg-white/10 focus:outline-none"
                     >
                         {open ? (
@@ -153,12 +168,21 @@ const Header = () => {
                                         <Link to="/documents" className="block py-2 text-indigo-100 hover:text-white" onClick={() => setOpen(false)}>All Documents</Link>
                                     </li>
                                     {(user && (user.role === 'admin' || user.role === 'technical-admin')) && (
-                                        <li>
-                                            <Link to="/admin/users" className="block py-2 text-indigo-100 hover:text-white" onClick={() => setOpen(false)}>User Management</Link>
-                                        </li>
+                                        <>
+                                            <li className="text-xs font-semibold text-indigo-300 uppercase tracking-wider mt-2">Admin Tools</li>
+                                            <li>
+                                                <Link to="/admin/users" className="block py-2 pl-4 text-indigo-100 hover:text-white" onClick={() => setOpen(false)}>User Management</Link>
+                                            </li>
+                                            <li>
+                                                <Link to="/admin/logs" className="block py-2 pl-4 text-indigo-100 hover:text-white" onClick={() => setOpen(false)}>Activity Logs</Link>
+                                            </li>
+                                            <li>
+                                                <Link to="/reports" className="block py-2 pl-4 text-indigo-100 hover:text-white" onClick={() => setOpen(false)}>Reports</Link>
+                                            </li>
+                                        </>
                                     )}
                                     <li>
-                                        <button onClick={() => { onLogout(); setOpen(false); }} className="flex items-center gap-2 w-full text-left py-2 text-red-300 hover:text-red-100">
+                                        <button onClick={() => { onLogout(); setOpen(false); }} className="flex items-center gap-2 w-full text-left py-2 text-red-300 hover:text-red-100 mt-2 border-t border-indigo-600 pt-4">
                                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                                             </svg>
