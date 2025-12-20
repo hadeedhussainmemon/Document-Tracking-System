@@ -72,16 +72,14 @@ router.post('/', [auth, [
 });
 
 // @route   GET api/documents
-// @desc    Get all documents (with simple search)
+// @desc    Get all documents (Sorted by Priority then Date)
 router.get('/', auth, async (req, res) => {
     try {
         const search = req.query.search;
-        let query = {};
-
-        // If user is basic employee, maybe restrict? Assuming open visibility for now based on legacy app
+        let matchStage = {};
 
         if (search) {
-            query = {
+            matchStage = {
                 $or: [
                     { title: { $regex: search, $options: 'i' } },
                     { docRefShort: { $regex: search, $options: 'i' } },
@@ -90,10 +88,57 @@ router.get('/', auth, async (req, res) => {
             };
         }
 
-        const documents = await Document.find(query)
-            .populate('creator', 'username')
-            .populate('currentHolder', 'username')
-            .sort({ updatedAt: -1 });
+        const documents = await Document.aggregate([
+            { $match: matchStage },
+            {
+                $addFields: {
+                    priorityOrder: {
+                        $switch: {
+                            branches: [
+                                { case: { $eq: ["$priority", "High"] }, then: 3 },
+                                { case: { $eq: ["$priority", "Medium"] }, then: 2 },
+                                { case: { $eq: ["$priority", "Low"] }, then: 1 }
+                            ],
+                            default: 0
+                        }
+                    }
+                }
+            },
+            { $sort: { priorityOrder: -1, updatedAt: -1 } },
+            // Populate creator and currentHolder manually or using $lookup
+            // To keep it simple and consistent with mongoose object structure for frontend (populating is easier with find, but aggregate returns raw objects),
+            // I will restrict aggregation to just fetching IDs or use $lookup.
+            // Actually, simpler approach for this scale: fetch all, sort in JS. 
+            // BUT for strict correctness/pagination later, aggregation is better.
+            // Let's use $lookup for creator/holder.
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "creator",
+                    foreignField: "_id",
+                    as: "creator"
+                }
+            },
+            { $unwind: { path: "$creator", preserveNullAndEmptyArrays: true } }, // Unwind array to object
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "currentHolder",
+                    foreignField: "_id",
+                    as: "currentHolder"
+                }
+            },
+            { $unwind: { path: "$currentHolder", preserveNullAndEmptyArrays: true } },
+            {
+                $project: {
+                    "creator.password": 0, // Exclude sensitive info
+                    "creator.__v": 0,
+                    "currentHolder.password": 0,
+                    "currentHolder.__v": 0,
+                    priorityOrder: 0 // Remove the helper field
+                }
+            }
+        ]);
 
         res.json(documents);
     } catch (err) {
@@ -108,12 +153,112 @@ router.get('/:id', auth, async (req, res) => {
         const doc = await Document.findById(req.params.id)
             .populate('creator', 'username')
             .populate('history.performedBy', 'username')
-            .populate('comments.user', 'username');
+            .populate('comments.user', 'username')
+            .populate('versions.modifiedBy', 'username');
 
         if (!doc) return res.status(404).json({ msg: 'Document not found' });
         res.json(doc);
     } catch (err) {
         if (err.kind === 'ObjectId') return res.status(404).json({ msg: 'Document not found' });
+        res.status(500).send('Server Error');
+    }
+});
+
+// @route   PUT api/documents/:id (Edit Document with Versioning)
+router.put('/:id', [auth, [
+    check('title', 'Title is required').optional(),
+    check('content', 'Content is required').optional()
+]], async (req, res) => {
+    try {
+        const doc = await Document.findById(req.params.id);
+        if (!doc) return res.status(404).json({ msg: 'Not found' });
+
+        // Check ownership or permission
+        if (doc.creator.toString() !== req.user.id && req.user.role !== 'admin') {
+            return res.status(403).json({ msg: 'Not authorized to edit' });
+        }
+
+        const { title, content } = req.body;
+        let changed = false;
+
+        // Snapshot current version if content/title changes
+        if ((title && title !== doc.title) || (content && content !== doc.content)) {
+            doc.versions.push({
+                version: doc.currentVersion,
+                title: doc.title,
+                content: doc.content,
+                modifiedBy: req.user.id,
+                timestamp: Date.now()
+            });
+            doc.currentVersion += 1;
+            changed = true;
+        }
+
+        if (title) doc.title = title;
+        if (content) doc.content = content;
+
+        if (changed) {
+            doc.history.push({
+                action: 'Edited',
+                performedBy: req.user.id,
+                comment: `Updated to version ${doc.currentVersion}`
+            });
+            doc.updatedAt = Date.now();
+            await doc.save();
+        }
+
+        res.json(doc);
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error');
+    }
+});
+
+// @route   GET api/documents/:id/versions
+router.get('/:id/versions', auth, async (req, res) => {
+    try {
+        const doc = await Document.findById(req.params.id).select('versions currentVersion title');
+        if (!doc) return res.status(404).json({ msg: 'Not found' });
+        res.json(doc.versions);
+    } catch (err) {
+        res.status(500).send('Server Error');
+    }
+});
+
+// @route   POST api/documents/:id/rollback
+router.post('/:id/rollback', auth, async (req, res) => {
+    const { version } = req.body;
+    try {
+        const doc = await Document.findById(req.params.id);
+        if (!doc) return res.status(404).json({ msg: 'Not found' });
+
+        const targetVer = doc.versions.find(v => v.version === Number(version));
+        if (!targetVer) return res.status(404).json({ msg: 'Version not found' });
+
+        // Save CURRENT state as a new version before rolling back (Safety)
+        doc.versions.push({
+            version: doc.currentVersion,
+            title: doc.title,
+            content: doc.content,
+            modifiedBy: req.user.id,
+            timestamp: Date.now()
+        });
+        doc.currentVersion += 1;
+
+        // Apply Rollback
+        doc.title = targetVer.title;
+        doc.content = targetVer.content;
+
+        doc.history.push({
+            action: 'Rollback',
+            performedBy: req.user.id,
+            comment: `Rolled back to version ${version}`
+        });
+
+        await doc.save();
+        res.json(doc);
+    } catch (err) {
+        console.error(err);
         res.status(500).send('Server Error');
     }
 });

@@ -30,13 +30,21 @@ const DocumentPage = () => {
 
     useEffect(() => {
         getDocument(id);
+
+        // Feature: Real-Time Polling
+        const interval = setInterval(() => {
+            getDocument(id);
+        }, 5000); // Poll every 5 seconds
+
+        return () => clearInterval(interval);
         // eslint-disable-next-line
     }, [id]);
 
     const submitDoc = async () => {
         try {
-            await axios.put(`/documents/${document._id}/submit`);
+            await axios.put(`/documents/${document._id}/submit`, { comment: 'Submitted for approval' });
             getDocument(id);
+            setAlert('Document submitted', 'success');
         } catch (err) {
             setAlert(err.response?.data?.msg || 'Submission failed', 'danger');
         }
@@ -44,21 +52,22 @@ const DocumentPage = () => {
 
     const approveDoc = async () => {
         try {
-            await axios.put(`/documents/${document._id}/approve`);
+            await axios.put(`/documents/${document._id}/approve`, { comment: 'Approved' });
             getDocument(id);
+            setAlert('Document approved', 'success');
         } catch (err) {
             setAlert(err.response?.data?.msg || 'Approval failed', 'danger');
         }
     };
 
-    const rejectDoc = async () => {
-        const reason = window.prompt('Enter rejection reason:');
-        if (reason === null) return;
+    const rollbackDoc = async (version) => {
+        if (!window.confirm(`Are you sure you want to rollback to version ${version}? Current changes will be saved as a new version.`)) return;
         try {
-            await axios.put(`/documents/${document._id}/reject`, { reason });
+            await axios.post(`/documents/${document._id}/rollback`, { version });
             getDocument(id);
+            setAlert(`Rolled back to version ${version}`, 'success');
         } catch (err) {
-            setAlert(err.response?.data?.msg || 'Rejection failed', 'danger');
+            setAlert(err.response?.data?.msg || 'Rollback failed', 'danger');
         }
     };
 
@@ -77,31 +86,6 @@ const DocumentPage = () => {
                     </Container>
                 </main>
                 <Footer />
-                {document && <ForwardModal isOpen={forwardOpen} onClose={() => setForwardOpen(false)} onConfirm={async (toUserId) => {
-                    try {
-                        await forwardDocument(document._id, toUserId);
-                        setForwardOpen(false);
-                        // reload the document to reflect changes
-                        getDocument(id);
-                    } catch (err) {
-                        console.error(err);
-                    }
-                }} />}
-                {document && <CloseModal isOpen={closeOpen} onClose={() => setCloseOpen(false)} onConfirm={async (closingMessage) => {
-                    try {
-                        await forwardDocument(document._id, document.assignedTo ? document.assignedTo._id || document.assignedTo : undefined); // ensure assigned structure remains
-                    } catch (err) {
-                        // ignore
-                    }
-                    try {
-                        // call updateDocument with status closed and closingMessage (via context)
-                        await updateDocument({ _id: document._id, title: document.title, content: document.content, tags: document.tags, metadata: document.metadata, status: 'Closed', closingMessage });
-                        setCloseOpen(false);
-                        getDocument(id);
-                    } catch (err) {
-                        console.error(err);
-                    }
-                }} />}
             </div>
         );
     }
@@ -115,7 +99,6 @@ const DocumentPage = () => {
                         <div className='flex items-center justify-between mb-6'>
                             <Link to="/dashboard" className="text-blue-500 hover:underline">&larr; Back to Dashboard</Link>
                             <div className='flex flex-col sm:flex-row gap-2 items-center'>
-                                {/* Copy docRef */}
                                 {document.docRef && (
                                     <button
                                         onClick={() => {
@@ -128,23 +111,16 @@ const DocumentPage = () => {
                                         {copied ? 'Copied!' : 'Copy ID'}
                                     </button>
                                 )}
-                                {/* Edit */}
-                                {(user && (user.role === 'admin' || String(user._id) === String(document.owner._id))) && (
+                                {(user && (user.role === 'admin' || String(user._id) === String(document.creator?._id || document.owner?._id))) && (
                                     <Button variant='secondary' size='sm' onClick={() => { setCurrent(document); navigate('/dashboard'); }} className='w-full sm:w-auto'>Edit</Button>
                                 )}
-                                {/* Forward */}
-                                {(user && (user.role === 'admin' || String(user._id) === String(document.owner._id) || (document.assignedTo && String(user._id) === String(document.assignedTo._id)))) && (
+                                {(user && (user.role === 'admin' || String(user._id) === String(document.creator?._id || document.owner?._id))) && (
                                     <Button variant='primary' size='sm' onClick={() => setForwardOpen(true)} className='w-full sm:w-auto'>Forward</Button>
                                 )}
-                                {/* Delete */}
-                                {(user && (user.role === 'admin' || String(user._id) === String(document.owner._id))) && (
-                                    <Button variant='danger' size='sm' onClick={async () => { const ok = await deleteDocument(document._id); if (ok) navigate('/dashboard'); else setAlert('Failed to delete', 'danger'); }} className='w-full sm:w-auto'>Delete</Button>
-                                )}
-                                {/* Workflow Actions */}
-                                {user && document.status === 'Draft' && String(user._id) === String(document.owner._id) && (
+                                {user && document.status === 'Draft' && (
                                     <Button variant='primary' size='sm' onClick={submitDoc} className='w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700'>Submit Approval</Button>
                                 )}
-                                {user && document.status === 'Pending Approval' && ['admin', 'technical-admin', 'manager', 'ceo'].includes(user.role) && (
+                                {(user && document.status === 'Pending' || document.status === 'Pending Approval') && (
                                     <>
                                         <Button variant='secondary' size='sm' onClick={approveDoc} className='w-full sm:w-auto bg-green-600 text-white hover:bg-green-700'>Approve</Button>
                                         <Button variant='danger' size='sm' onClick={rejectDoc} className='w-full sm:w-auto'>Reject</Button>
@@ -152,30 +128,43 @@ const DocumentPage = () => {
                                 )}
                             </div>
                         </div>
-                        <div className="mb-2">
-                            <div className='flex items-start justify-between gap-6'>
-                                <div>
-                                    <h1 className="text-4xl font-bold text-gray-800 mb-2">{document.title}</h1>
-                                    <div className='flex items-center gap-4 text-sm text-gray-500'>
-                                        {document.docRef && (
-                                            <div>Document ID: <span className="font-medium text-gray-700">{document.docRef}</span></div>
-                                        )}
-                                        <div>Created: <span className='font-medium text-gray-700'>{new Date(document.createdAt).toLocaleString()}</span></div>
-                                        <div>Updated: <span className='font-medium text-gray-700'>{new Date(document.updatedAt).toLocaleString()}</span></div>
+
+                        {/* Workflow Status Banner */}
+                        {document.workflow && document.status !== 'Approved' && document.status !== 'Rejected' && (
+                            <div className="mb-6 bg-blue-50 border-l-4 border-blue-500 p-4">
+                                <div className="flex">
+                                    <div className="flex-shrink-0">
+                                        <svg className="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                        </svg>
                                     </div>
-                                    <div className='my-2 text-sm text-gray-600'>Owner: <span className='font-medium text-gray-700'>{document.owner && (document.owner.username || document.owner._id)}</span>{document.owner && document.owner.role ? ` (${document.owner.role})` : ''}</div>
-                                    {document.assignedTo && (
-                                        <div className='text-sm text-gray-600'>Assigned to: <span className='font-medium text-gray-700'>{document.assignedToName || (document.assignedTo.username || document.assignedTo._id)}</span></div>
-                                    )}
+                                    <div className="ml-3">
+                                        <p className="text-sm text-blue-700">
+                                            Current Workflow Step: <span className="font-bold">{document.currentStep}</span> (Waiting for Approval)
+                                        </p>
+                                    </div>
                                 </div>
-                                <div className='flex flex-col items-end'>
-                                    <span className={`px-3 py-1 rounded-full text-sm font-medium 
-                                        ${document.status === 'Approved' ? 'bg-green-100 text-green-800' : ''}
-                                        ${document.status === 'Pending Approval' ? 'bg-amber-100 text-amber-800' : ''}
-                                        ${document.status === 'Rejected' ? 'bg-red-100 text-red-800' : ''}
-                                        ${document.status === 'Closed' ? 'bg-slate-100 text-slate-800' : ''}
-                                        ${document.status === 'Draft' ? 'bg-gray-100 text-gray-800' : ''}
-                                        ${!document.status || document.status === 'Open' ? 'bg-blue-100 text-blue-800' : ''}
+                            </div>
+                        )}
+
+                        <div className="mb-2">
+                            <div className='flex flex-col md:flex-row items-start md:items-center justify-between gap-6'>
+                                <div className="w-full md:w-auto">
+                                    <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-2 leading-tight break-words">{document.title}</h1>
+                                    <div className='flex items-center gap-4 text-sm text-gray-500'>
+                                        <div>Version: <span className="font-semibold text-gray-700 bg-gray-100 px-2 py-0.5 rounded ml-1">{document.currentVersion || 1}</span></div>
+                                        <div className="hidden sm:block">•</div>
+                                        <div>Created: <span className='font-medium text-gray-700'>{new Date(document.createdAt).toLocaleDateString()}</span></div>
+                                    </div>
+                                </div>
+                                <div className='flex items-center gap-2 self-start md:self-auto mt-2 md:mt-0'>
+                                    <span className={`px-4 py-1.5 rounded-full text-sm font-bold shadow-sm border 
+                                        ${document.status === 'Approved' ? 'bg-green-50 text-green-700 border-green-200' : ''}
+                                        ${document.status === 'Pending Approval' ? 'bg-amber-50 text-amber-700 border-amber-200' : ''}
+                                        ${document.status === 'Rejected' ? 'bg-red-50 text-red-700 border-red-200' : ''}
+                                        ${document.status === 'Closed' ? 'bg-slate-100 text-slate-700 border-slate-200' : ''}
+                                        ${document.status === 'Draft' ? 'bg-gray-100 text-gray-700 border-gray-200' : ''}
+                                        ${!document.status || document.status === 'Open' ? 'bg-blue-50 text-blue-700 border-blue-200' : ''}
                                     `}>{document.status || 'Open'}</span>
                                 </div>
                             </div>
@@ -186,32 +175,19 @@ const DocumentPage = () => {
                                 <div className='mb-4 p-4 bg-white border rounded shadow-sm'>
                                     <p className="text-gray-700 whitespace-pre-wrap">{document.content}</p>
                                 </div>
-                                {document.metadata && Object.keys(document.metadata).length > 0 && (
-                                    <div className='mb-4 p-4 bg-white border rounded shadow-sm'>
-                                        <div className='flex items-center justify-between mb-2'>
-                                            <h3 className="text-lg font-semibold text-gray-800 ">Metadata</h3>
-                                            <button className='text-xs text-gray-500' onClick={() => setShowMetadata(!showMetadata)}>{showMetadata ? 'Hide' : 'Show'}</button>
-                                        </div>
-                                        {showMetadata && (
-                                            <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
-                                                {Object.entries(document.metadata).map(([k, v]) => (
-                                                    <div key={k} className='bg-gray-50 p-2 rounded border'>
-                                                        <div className='text-xs text-gray-500'>{k}</div>
-                                                        <div className='text-sm font-medium text-gray-700'>{String(v)}</div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                                {document.versionHistory && document.versionHistory.length > 0 && (
+
+                                {/* Version History UI */}
+                                {document.versions && document.versions.length > 0 && (
                                     <div className='mb-4 p-4 bg-white border rounded shadow-sm'>
                                         <h3 className="text-lg font-semibold text-gray-800 mb-2">Version History</h3>
                                         <div className='space-y-4'>
-                                            {document.versionHistory.map((version, index) => (
-                                                <div key={index} className='border rounded p-3'>
-                                                    <div className='flex items-center justify-between'><div className='text-sm font-semibold'>Version {document.versionHistory.length - index}</div><div className='text-xs text-gray-500'>{new Date(version.editedAt).toLocaleString()}</div></div>
-                                                    <div className='text-sm text-gray-700 mt-2 whitespace-pre-wrap'>{version.content}</div>
+                                            {document.versions.map((version) => (
+                                                <div key={version.version} className='border rounded p-3 flex justify-between items-center'>
+                                                    <div>
+                                                        <div className='text-sm font-semibold'>Version {version.version}</div>
+                                                        <div className='text-xs text-gray-500'>{new Date(version.timestamp).toLocaleString()}</div>
+                                                    </div>
+                                                    <Button size="sm" variant="secondary" onClick={() => rollbackDoc(version.version)}>Rollback</Button>
                                                 </div>
                                             ))}
                                         </div>
@@ -228,44 +204,21 @@ const DocumentPage = () => {
                             </div>
                         </div>
 
-                        {document.tags && document.tags.length > 0 && (
-                            <div className="mb-6">
-                                <h3 className="text-xl font-semibold text-gray-800 mb-2">Tags</h3>
-                                <div className="flex flex-wrap gap-2">
-                                    {document.tags.map(tag => (
-                                        <span key={tag} className="bg-gray-200 rounded-full px-3 py-1 text-sm font-semibold text-gray-700">
-                                            #{tag}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
                         {/* Comments Section */}
                         <CommentsSection documentId={document._id} comments={document.comments} currentUser={user} />
-
-                        {document.versionHistory && document.versionHistory.length > 0 && (
-                            <div>
-                                <h3 className="text-2xl font-bold text-gray-800 mb-4 border-t pt-6">Version History</h3>
-                                <div className="space-y-6">
-                                    {document.versionHistory.map((version, index) => (
-                                        <div key={index} className='p-4 bg-gray-50 rounded-lg border border-gray-200'>
-                                            <p className='text-md font-semibold text-gray-800'>
-                                                Version {document.versionHistory.length - index}
-                                            </p>
-                                            <p className='text-xs text-gray-500 mb-2'>
-                                                Edited at: {new Date(version.editedAt).toLocaleString()}
-                                            </p>
-                                            <p className='text-sm text-gray-700 whitespace-pre-wrap'>{version.content}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
                     </div>
                 </Container>
             </main>
             <Footer />
+            {document && <ForwardModal isOpen={forwardOpen} onClose={() => setForwardOpen(false)} onConfirm={async (toUserId) => {
+                try {
+                    await forwardDocument(document._id, toUserId);
+                    setForwardOpen(false);
+                    getDocument(id);
+                } catch (err) {
+                    console.error(err);
+                }
+            }} />}
         </div>
     );
 };

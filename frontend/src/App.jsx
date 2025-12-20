@@ -15,56 +15,59 @@ import Alerts from './components/Alerts';
 import AdminUsers from './pages/AdminUsers';
 import ActivityLogs from './components/admin/ActivityLogs';
 import Reports from './pages/Reports';
+import { ThemeProvider } from './context/ThemeContext';
 
 function App() {
   return (
     <AuthState>
       <DocumentState>
         <AlertState>
-          <Router>
-            <div className='min-h-screen'>
-              <Alerts />
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={
-                  <AdminRoute>
-                    <Register />
-                  </AdminRoute>
-                } />
-                <Route path="/dashboard" element={
-                  <PrivateRoute>
-                    <Dashboard />
-                  </PrivateRoute>
-                } />
-                <Route path="/documents" element={
-                  <PrivateRoute>
-                    <AllDocuments />
-                  </PrivateRoute>
-                } />
-                <Route path="/admin/users" element={
-                  <AdminRoute roles={['admin', 'technical-admin', 'manager', 'ceo', 'hr']}>
-                    <AdminUsers />
-                  </AdminRoute>
-                } />
-                <Route path="/admin/logs" element={
-                  <AdminRoute>
-                    <ActivityLogs />
-                  </AdminRoute>
-                } />
-                <Route path="/reports" element={
-                  <AdminRoute>
-                    <Reports />
-                  </AdminRoute>
-                } />
-                <Route path="/document/:id" element={
-                  <PrivateRoute>
-                    <DocumentPage />
-                  </PrivateRoute>
-                } />
-              </Routes>
-            </div>
-          </Router>
+          <ThemeProvider>
+            <Router>
+              <div className='min-h-screen bg-[var(--color-bg-body)] text-[var(--color-text-main)] transition-colors duration-300'>
+                <Alerts />
+                <Routes>
+                  <Route path="/" element={<Home />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={
+                    <AdminRoute>
+                      <Register />
+                    </AdminRoute>
+                  } />
+                  <Route path="/dashboard" element={
+                    <PrivateRoute>
+                      <Dashboard />
+                    </PrivateRoute>
+                  } />
+                  <Route path="/documents" element={
+                    <PrivateRoute>
+                      <AllDocuments />
+                    </PrivateRoute>
+                  } />
+                  <Route path="/admin/users" element={
+                    <AdminRoute roles={['admin', 'technical-admin', 'manager', 'ceo', 'hr']}>
+                      <AdminUsers />
+                    </AdminRoute>
+                  } />
+                  <Route path="/admin/logs" element={
+                    <AdminRoute>
+                      <ActivityLogs />
+                    </AdminRoute>
+                  } />
+                  <Route path="/reports" element={
+                    <AdminRoute>
+                      <Reports />
+                    </AdminRoute>
+                  } />
+                  <Route path="/document/:id" element={
+                    <PrivateRoute>
+                      <DocumentPage />
+                    </PrivateRoute>
+                  } />
+                </Routes>
+              </div>
+            </Router>
+          </ThemeProvider>
         </AlertState>
       </DocumentState>
     </AuthState>

@@ -38,7 +38,8 @@ const DocumentForm = () => {
                 title: '',
                 content: '',
                 tags: '',
-                status: 'Open'
+                status: 'Open',
+                priority: 'Medium'
             });
             setMetadataRows([{ key: '', value: '' }]);
         }
@@ -56,6 +57,32 @@ const DocumentForm = () => {
 
 
     const { title, content, tags, status, assignedTo } = document;
+    const [suggestedTags, setSuggestedTags] = useState([]);
+
+    // "AI" Smart Tag Logic
+    useEffect(() => {
+        const textToScan = (title + ' ' + content).toLowerCase();
+        const suggestions = [];
+
+        // Rules engine
+        if (textToScan.includes('urgent') || textToScan.includes('asap') || textToScan.includes('immediately')) suggestions.push('Urgent');
+        if (textToScan.includes('finance') || textToScan.includes('budget') || textToScan.includes('cost') || textToScan.includes('invoice')) suggestions.push('Finance');
+        if (textToScan.includes('legal') || textToScan.includes('contract') || textToScan.includes('agreement')) suggestions.push('Legal');
+        if (textToScan.includes('report') || textToScan.includes('Q1') || textToScan.includes('Q2')) suggestions.push('Report');
+        if (textToScan.includes('meeting') || textToScan.includes('minutes')) suggestions.push('Meeting');
+        if (textToScan.includes('secret') || textToScan.includes('confidential')) suggestions.push('Confidential');
+
+        const currentTags = tags.split(',').map(t => t.trim().toLowerCase());
+        const newSuggestions = suggestions.filter(s => !currentTags.includes(s.toLowerCase()));
+
+        setSuggestedTags([...new Set(newSuggestions)]);
+    }, [title, content, tags]);
+
+    const addTag = (tag) => {
+        const newTags = tags ? `${tags}, ${tag}` : tag;
+        setDocument({ ...document, tags: newTags });
+        setSuggestedTags(prev => prev.filter(t => t !== tag));
+    };
 
     const onChange = e =>
         setDocument({ ...document, [e.target.name]: e.target.value });
@@ -79,7 +106,7 @@ const DocumentForm = () => {
 
     const onSubmit = async e => {
         e.preventDefault();
-        
+
         if (title.trim() === '' || content.trim() === '') {
             setAlert('Please fill in all required fields', 'danger');
             return;
@@ -98,7 +125,8 @@ const DocumentForm = () => {
                 content,
                 tags: tags.split(',').map(tag => tag.trim()).filter(tag => tag !== ''),
                 metadata: metadataObj,
-                status
+                status,
+                priority: document.priority || 'Medium'
             };
             if (assignedTo) {
                 documentData.assignedTo = assignedTo;
@@ -147,21 +175,52 @@ const DocumentForm = () => {
                 required
                 className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline mb-4"
             />
-                <input
+            <input
                 type='text'
                 placeholder='Tags (comma-separated)'
                 name='tags'
                 value={tags}
                 onChange={onChange}
-                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline mb-4"
+                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline mb-2"
             />
-                <div className="mb-4">
-                    <label className="block text-gray-700 text-sm font-bold mb-2">Assign to (Concern Head)</label>
-                    <select name="assignedTo" value={assignedTo || ''} onChange={onChange} className="shadow border rounded w-full py-2 px-3 text-gray-700 focus:outline-none mb-4 bg-white">
+            {/* AI Suggestions */}
+            {suggestedTags.length > 0 && (
+                <div className="mb-4 animate-fade-in">
+                    <p className="text-xs text-indigo-600 font-bold mb-1 flex items-center">
+                        <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"></path></svg>
+                        AI Suggestions:
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                        {suggestedTags.map(tag => (
+                            <button
+                                key={tag}
+                                type="button"
+                                onClick={() => addTag(tag)}
+                                className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs px-2 py-1 rounded-full border border-indigo-200 transition-colors flex items-center"
+                            >
+                                + {tag}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+            <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-gray-700 text-sm font-bold mb-2">Assign to</label>
+                    <select name="assignedTo" value={assignedTo || ''} onChange={onChange} className="shadow border rounded w-full py-2 px-3 text-gray-700 focus:outline-none bg-white">
                         <option value="">None</option>
                         {heads.map(h => <option key={h._id} value={h._id}>{h.fullName || h.username} ({h.role})</option>)}
                     </select>
                 </div>
+                <div>
+                    <label className="block text-gray-700 text-sm font-bold mb-2">Priority</label>
+                    <select name="priority" value={document.priority || 'Medium'} onChange={onChange} className="shadow border rounded w-full py-2 px-3 text-gray-700 focus:outline-none bg-white">
+                        <option value="Low">Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                    </select>
+                </div>
+            </div>
             {current && (
                 <div className="mb-4">
                     <label className="block text-gray-700 text-sm font-bold mb-2">Status</label>

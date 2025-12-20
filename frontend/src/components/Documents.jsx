@@ -3,7 +3,7 @@ import DocumentItem from './DocumentItem';
 import DocumentContext from '../context/document/DocumentContext.js';
 import Spinner from './Spinner';
 
-const Documents = ({ skipFetch = false, selectable = false, selectedIds = [], onToggle = () => {} }) => {
+const Documents = ({ skipFetch = false, selectable = false, selectedIds = [], onToggle = () => { } }) => {
     const documentContext = useContext(DocumentContext);
 
     const { documents, filtered, getDocuments, loading } = documentContext;
@@ -18,7 +18,7 @@ const Documents = ({ skipFetch = false, selectable = false, selectedIds = [], on
             <div className="text-center py-10">
                 <h4 className="text-xl font-semibold mb-2">No documents yet</h4>
                 <p className="text-gray-600 mb-4">Start by adding your first document.</p>
-                <button onClick={() => { const el = document.getElementById('document-form'); if (el) { el.scrollIntoView({ behavior: 'smooth' }); el.querySelector('input, textarea')?.focus(); } }} className="btn-primary">Add Document</button>
+                <button onClick={() => { const el = document.getElementById('document-form'); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.querySelector('input, textarea')?.focus(); } }} className="btn btn-primary">Add Document</button>
             </div>
         );
     }

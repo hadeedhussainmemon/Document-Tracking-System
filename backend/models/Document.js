@@ -23,6 +23,11 @@ const DocumentSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
     },
+    workflow: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Workflow'
+    },
+    currentStep: { type: Number, default: 0 }, // 0 = Draft/Pending, 1 = Step 1...
     history: [{
         action: String,
         performedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -36,6 +41,14 @@ const DocumentSchema = new mongoose.Schema({
         text: String,
         date: { type: Date, default: Date.now }
     }],
+    versions: [{
+        version: { type: Number, required: true },
+        title: String,
+        content: String,
+        modifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        timestamp: { type: Date, default: Date.now }
+    }],
+    currentVersion: { type: Number, default: 1 },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
