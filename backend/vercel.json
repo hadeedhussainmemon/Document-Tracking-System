@@ -1,8 +1,12 @@
 {
+  "version": 2,
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/[...path]"
+      "destination": "/api/index.js"
     }
-  ]
+  ],
+  "env": {
+    "CLIENT_ORIGIN": "http://localhost:3000,http://localhost:5173,https://document-tracking-system-phi.vercel.app"
+  }
 }

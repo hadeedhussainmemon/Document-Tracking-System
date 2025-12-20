@@ -71,6 +71,11 @@ const login = async (req, res) => {
 
     const { username, password } = req.body;
 
+    // Fail immediately if DB is not connected (avoids hanging request)
+    if (require('mongoose').connection.readyState !== 1) {
+        return res.status(503).json({ msg: 'Database connection unavailable' });
+    }
+
     try {
         let user = await User.findOne({ username });
         if (!user) {
